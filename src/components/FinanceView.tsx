@@ -387,7 +387,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-brand-secondary mb-1.5 uppercase">Total Paid ($)</label>
+                  <label className="block text-brand-secondary mb-1.5 uppercase">Total Paid ({currencySymbol})</label>
                   <input 
                     type="number" 
                     value={fuelCost}
@@ -408,7 +408,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   required
                 />
                 <p className="text-[10px] text-gray-500 font-sans mt-2">
-                  System Audit: Liter costs higher than <strong>$4.50/Liter</strong> are automatically marked for audit review as <strong>Flagged</strong>.
+                  System Audit: Liter costs higher than <strong>{currencySymbol}4.50/Liter</strong> are automatically marked for audit review as <strong>Flagged</strong>.
                 </p>
               </div>
 
@@ -478,7 +478,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-brand-secondary mb-1.5 uppercase">Amount Paid ($)</label>
+                  <label className="block text-brand-secondary mb-1.5 uppercase">Amount Paid ({currencySymbol})</label>
                   <input 
                     type="number" 
                     value={expAmount}

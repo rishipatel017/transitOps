@@ -26,6 +26,7 @@ interface TripsViewProps {
   onCompleteTrip: (id: string, fuelConsumed: number, finalOdometer: number) => void;
   onCancelTrip: (id: string) => void;
   currentRole?: string;
+  currencySymbol?: string;
 }
 
 export const TripsView: React.FC<TripsViewProps> = ({
@@ -36,7 +37,8 @@ export const TripsView: React.FC<TripsViewProps> = ({
   onDispatchTrip,
   onCompleteTrip,
   onCancelTrip,
-  currentRole
+  currentRole,
+  currencySymbol = '$'
 }) => {
   const toast = useToast();
   const [isNewTripOpen, setIsNewTripOpen] = useState(false);
@@ -304,7 +306,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
                   <div>
                     <span className="text-[10px] text-gray-500 font-mono block">PLANNED ROI</span>
                     <span className="text-xs text-emerald-400 font-mono font-semibold block mt-1">
-                      +${trip.revenue.toLocaleString()}
+                      +{currencySymbol}{trip.revenue.toLocaleString()}
                     </span>
                     <span className="text-[10px] text-gray-500 font-mono block">{trip.plannedDistance} km planned</span>
                   </div>
@@ -499,7 +501,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Planned Revenue ($)</label>
+                  <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Planned Revenue ({currencySymbol})</label>
                   <input 
                     type="number" 
                     value={estRevenue}

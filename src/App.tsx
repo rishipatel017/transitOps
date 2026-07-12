@@ -587,6 +587,7 @@ function AppInner() {
               onDeleteVehicle={handleDeleteVehicle}
               onAddMaintenance={handleAddMaintenance}
               onCompleteMaintenance={handleCompleteMaintenance}
+              currencySymbol={settings.currencySymbol}
             />
           )}
 
@@ -609,6 +610,7 @@ function AppInner() {
               onCompleteTrip={handleCompleteTrip}
               onCancelTrip={handleCancelTrip}
               currentRole={currentUser.role}
+              currencySymbol={settings.currencySymbol}
             />
           )}
 

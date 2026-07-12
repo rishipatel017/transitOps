@@ -25,6 +25,7 @@ interface FleetViewProps {
   onDeleteVehicle: (registrationNumber: string) => void;
   onAddMaintenance: (log: MaintenanceLog) => void;
   onCompleteMaintenance: (id: string, actualCost: number) => void;
+  currencySymbol?: string;
 }
 
 export const FleetView: React.FC<FleetViewProps> = ({
@@ -34,7 +35,8 @@ export const FleetView: React.FC<FleetViewProps> = ({
   onUpdateVehicle,
   onDeleteVehicle,
   onAddMaintenance,
-  onCompleteMaintenance
+  onCompleteMaintenance,
+  currencySymbol = '$'
 }) => {
   const toast = useToast();
   // Modal states
@@ -325,7 +327,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                     <div>
                       <span className="text-[10px] text-gray-500 font-mono block">ACQUISITION COST</span>
                       <span className="text-white font-mono block mt-0.5">
-                        ${vehicle.acquisitionCost.toLocaleString()}
+                        {currencySymbol}{vehicle.acquisitionCost.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -413,7 +415,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                         {log.serviceType}
                         {log.notes && <span className="block text-[10px] text-gray-500 font-sans italic mt-0.5">"{log.notes}"</span>}
                       </td>
-                      <td className="py-3 px-4 font-bold text-white">${log.costEstimate.toLocaleString()}</td>
+                      <td className="py-3 px-4 font-bold text-white">{currencySymbol}{log.costEstimate.toLocaleString()}</td>
                       <td className="py-3 px-4">{log.completionDate}</td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -538,7 +540,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Acq. Cost ($)</label>
+                  <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Acq. Cost ({currencySymbol})</label>
                   <input 
                     type="number" 
                     value={acqCost}
@@ -650,7 +652,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Acq. Cost ($)</label>
+                  <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Acq. Cost ({currencySymbol})</label>
                   <input 
                     type="number" 
                     value={acqCost}
@@ -734,7 +736,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-brand-secondary font-mono mb-1.5 uppercase">Cost Estimate ($)</label>
+                  <label className="block text-brand-secondary font-mono mb-1.5 uppercase">Cost Estimate ({currencySymbol})</label>
                   <input 
                     type="number" 
                     value={maintCost}
@@ -788,7 +790,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
 
             <form onSubmit={handleCompleteMaintSubmit} className="space-y-4 text-xs font-mono">
               <div>
-                <label className="block text-brand-secondary mb-1.5 uppercase">Actual Settle Cost ($)</label>
+                <label className="block text-brand-secondary mb-1.5 uppercase">Actual Settle Cost ({currencySymbol})</label>
                 <input 
                   type="number" 
                   value={finalMaintCost}
