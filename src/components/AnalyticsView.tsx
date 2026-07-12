@@ -10,7 +10,8 @@ import {
   Wrench, 
   Percent,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Mail
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -22,12 +23,13 @@ import {
   Legend, 
   LineChart, 
   Line, 
-  Cell,
+  CartesianGrid,
   PieChart,
   Pie,
   AreaChart,
   Area
 } from 'recharts';
+import { sendSystemEmail } from '../emailService';
 
 interface AnalyticsViewProps {
   vehicles: Vehicle[];
@@ -46,7 +48,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   maintenance,
   fuel,
   expenses,
-  currencySymbol = '$'
+  currencySymbol = '₹'
 }) => {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('All');
   const [analyticsPeriod, setAnalyticsPeriod] = useState<'All' | 'HMV' | 'LMV'>('All');
@@ -161,6 +163,17 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     ? ((fuelWithLogs / distanceWithFuelLogs) * 100).toFixed(1) 
     : "35.2"; // standard fleet default reference value
 
+  const handleEmailReport = async () => {
+    const reportText = `TransitOps Weekly Performance Summary:\n\nTotal Revenue: ${currencySymbol}${totalRevenue.toLocaleString()}\nTotal Operational Costs: ${currencySymbol}${totalExpenses.toLocaleString()}\nNet Profit: ${currencySymbol}${Math.abs(netProfit).toLocaleString()}\nNet Margin: ${grossMarginPct}%\n\nReview the Analytics Dashboard for deeper insights.`;
+    
+    await sendSystemEmail(
+      'manager@transitops.com',
+      'TransitOps: Weekly Financial & Analytics Report',
+      reportText,
+      'Weekly Report'
+    );
+  };
+
   return (
     <div className="space-y-6" id="analytics-view-section">
       {/* Header and Top Control Panel */}
@@ -169,20 +182,29 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           <h2 className="text-2xl font-display font-bold text-white tracking-tight">Fleet Analytics & ROI Matrices</h2>
           <p className="text-xs text-brand-secondary">Correlate driver behaviors, heavy asset maintenance cost nodes, and financial yields.</p>
         </div>
-        <div className="flex rounded-md bg-brand-surface p-1 border border-brand-outline">
-          {(['All', 'HMV', 'LMV'] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setAnalyticsPeriod(p)}
-              className={`px-3.5 py-1.5 rounded-md text-xs font-semibold font-mono uppercase transition-all ${
-                analyticsPeriod === p 
-                  ? 'bg-brand-primary text-black font-semibold' 
-                  : 'text-brand-secondary hover:text-white'
-              }`}
-            >
-              {p} ASSETS
-            </button>
-          ))}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleEmailReport}
+            className="flex items-center gap-2 px-4 py-1.5 bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary border border-brand-primary/30 rounded-md text-xs font-semibold font-mono uppercase transition-all cursor-pointer"
+          >
+            <Mail className="h-4 w-4" />
+            Email Weekly Report
+          </button>
+          <div className="flex rounded-md bg-brand-surface p-1 border border-brand-outline">
+            {(['All', 'HMV', 'LMV'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setAnalyticsPeriod(p)}
+                className={`px-3.5 py-1.5 rounded-md text-xs font-semibold font-mono uppercase transition-all cursor-pointer ${
+                  analyticsPeriod === p 
+                    ? 'bg-brand-primary text-black font-semibold' 
+                    : 'text-brand-secondary hover:text-white'
+                }`}
+              >
+                {p} ASSETS
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

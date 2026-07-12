@@ -36,7 +36,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
   onDeleteVehicle,
   onAddMaintenance,
   onCompleteMaintenance,
-  currencySymbol = '$'
+  currencySymbol = '₹'
 }) => {
   const toast = useToast();
   // Modal states

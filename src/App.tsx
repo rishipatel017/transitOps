@@ -11,6 +11,7 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { SettingsView, SystemSettings } from './components/SettingsView';
 import { LoginView } from './components/LoginView';
 import { LandingView } from './components/LandingView';
+import { sendSystemEmail } from './emailService';
 import { motion } from 'motion/react';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { ToastContainer } from './components/ui/ToastContainer';
@@ -37,7 +38,7 @@ import {
 
 const ROLE_PERMISSIONS: Record<Role, string[]> = {
   'Fleet Manager': ['dashboard', 'fleet', 'drivers', 'trips', 'maintenance', 'finance', 'analytics', 'settings'],
-  'Driver': ['dashboard', 'trips'],
+  'Driver': ['dashboard', 'trips', 'finance', 'analytics'],
   'Safety Officer': ['dashboard', 'fleet', 'drivers', 'maintenance'],
   'Financial Analyst': ['dashboard', 'finance', 'analytics', 'settings']
 };
@@ -92,6 +93,25 @@ function AppInner() {
 
   const { vehicles, drivers, trips, maintenance, fuel, expenses, users = [], currentUser } = state;
 
+  let displayTrips = trips;
+  let displayFuel = fuel;
+  let displayExpenses = expenses;
+  let currentDriverProfile: Driver | undefined = undefined;
+
+  if (currentUser?.role === 'Driver') {
+    currentDriverProfile = drivers.find(d => d.name === currentUser.name);
+    if (currentDriverProfile) {
+      displayTrips = trips.filter(t => t.driverId === currentDriverProfile.licenseNumber);
+      const driverVehicleIds = new Set(displayTrips.map(t => t.vehicleId));
+      displayFuel = fuel.filter(f => driverVehicleIds.has(f.vehicleId));
+      displayExpenses = expenses.filter(e => driverVehicleIds.has(e.vehicleId));
+    } else {
+      displayTrips = [];
+      displayFuel = [];
+      displayExpenses = [];
+    }
+  }
+
   // Authentication Handlers
   const handleLogin = (user: User) => {
     setState(prev => ({
@@ -100,12 +120,48 @@ function AppInner() {
     }));
     setIsAuthenticated(true);
     sessionStorage.setItem('transitops_authenticated', 'true');
+
+    // Trigger Login Email Notification
+    sendSystemEmail(
+      'manager@transitops.com', 
+      'Security Alert: New System Login', 
+      `User ${user.name} (${user.email}) has successfully logged into the TransitOps system. Role: ${user.role}.`,
+      'Login Event'
+    );
   };
 
   const handleRegisterUser = (newUser: User) => {
     setState(prev => {
       const currentUsers = prev.users || [];
       const updatedUsers = [...currentUsers, newUser];
+      return {
+        ...prev,
+        users: updatedUsers
+      };
+    });
+  };
+
+  const handleUpdateUserStatus = (email: string, status: 'Pending' | 'Active' | 'Rejected') => {
+    setState(prev => {
+      const currentUsers = prev.users || [];
+      const updatedUsers = currentUsers.map(u => 
+        u.email === email ? { ...u, status } : u
+      );
+      
+      // Trigger Access Update Email
+      const targetUser = currentUsers.find(u => u.email === email);
+      if (targetUser && (status === 'Active' || status === 'Rejected')) {
+        const message = status === 'Active' 
+          ? 'Your access to the TransitOps system has been approved by the Fleet Manager. You can now log in.' 
+          : 'Your request for access to the TransitOps system has been rejected.';
+        sendSystemEmail(
+          email,
+          `TransitOps Account Status: ${status}`,
+          message,
+          'Account Access'
+        );
+      }
+
       return {
         ...prev,
         users: updatedUsers
@@ -234,6 +290,14 @@ function AppInner() {
       date: new Date().toISOString().split('T')[0],
       description: `Fuel consumption trip settle: ${tripId}`
     };
+
+    // Trigger Trip Completion Email
+    sendSystemEmail(
+      'manager@transitops.com',
+      `TransitOps Alert: Trip ${trip.id} Completed`,
+      `Trip ${trip.id} has been marked as completed by the driver. \nRevenue: ${settings.currencySymbol}${trip.estimatedRevenue}\nFuel Consumed: ${fuelConsumed}L\nFuel Cost: ${settings.currencySymbol}${calculatedFuelCost}`,
+      'Operations Update'
+    );
 
     setState(prev => {
       const updatedTrips = prev.trips.map(t => 
@@ -570,12 +634,14 @@ function AppInner() {
             <DashboardView 
               vehicles={vehicles}
               drivers={drivers}
-              trips={trips}
+              trips={displayTrips}
               maintenance={maintenance}
-              fuel={fuel}
-              expenses={expenses}
+              fuel={displayFuel}
+              expenses={displayExpenses}
               currentRole={currentUser.role}
               onNavigate={(tab) => setActiveTab(tab)}
+              currencySymbol={settings.currencySymbol}
+              currentDriver={currentDriverProfile}
             />
           )}
 
@@ -603,7 +669,7 @@ function AppInner() {
 
           {activeTab === 'trips' && (
             <TripsView 
-              trips={trips}
+              trips={displayTrips}
               vehicles={vehicles}
               drivers={drivers}
               onAddTrip={handleAddTrip}
@@ -617,8 +683,8 @@ function AppInner() {
 
           {activeTab === 'finance' && (
             <FinanceView 
-              fuel={fuel}
-              expenses={expenses}
+              fuel={displayFuel}
+              expenses={displayExpenses}
               vehicles={vehicles}
               onAddFuelLog={handleAddFuelLog}
               onAddExpense={handleAddExpense}
@@ -643,10 +709,10 @@ function AppInner() {
             <AnalyticsView 
               vehicles={vehicles}
               drivers={drivers}
-              trips={trips}
+              trips={displayTrips}
               maintenance={maintenance}
-              fuel={fuel}
-              expenses={expenses}
+              fuel={displayFuel}
+              expenses={displayExpenses}
               currencySymbol={settings.currencySymbol}
             />
           )}
@@ -660,6 +726,8 @@ function AppInner() {
               vehiclesCount={vehicles.length}
               driversCount={drivers.length}
               tripsCount={trips.length}
+              users={users}
+              onUpdateUserStatus={handleUpdateUserStatus}
             />
           )}
         </motion.div>

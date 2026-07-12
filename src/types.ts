@@ -30,11 +30,13 @@ export interface Trip {
   driverId: string;
   cargoWeight: number; // kg
   plannedDistance: number; // km
-  status: 'Draft' | 'Dispatched' | 'Completed' | 'Cancelled';
+  status: 'Draft' | 'Assigned' | 'Dispatched' | 'Completed' | 'Cancelled';
   eta: string;
   routeName: string;
   fuelConsumedLiters?: number;
   finalOdometer?: number;
+  estimatedDurationHrs?: number;
+  currentProgress?: number;
   revenue: number; // Used for ROI calculation
   date: string;
 }
@@ -73,4 +75,5 @@ export interface User {
   name: string;
   avatarUrl: string;
   password?: string;
+  status?: 'Pending' | 'Active' | 'Rejected';
 }

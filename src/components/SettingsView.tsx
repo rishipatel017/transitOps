@@ -30,6 +30,8 @@ interface SettingsViewProps {
   vehiclesCount: number;
   driversCount: number;
   tripsCount: number;
+  users?: User[];
+  onUpdateUserStatus?: (email: string, status: 'Pending' | 'Active' | 'Rejected') => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -39,7 +41,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   currentUser,
   vehiclesCount,
   driversCount,
-  tripsCount
+  tripsCount,
+  users = [],
+  onUpdateUserStatus
 }) => {
   const [fuelPrice, setFuelPrice] = useState(settings.fuelPricePerLiter);
   const [susThreshold, setSusThreshold] = useState(settings.suspiciousFuelPriceThreshold);
@@ -103,6 +107,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     onChange={(e) => setCurrency(e.target.value)}
                     className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg focus:outline-none focus:border-brand-primary"
                   >
+                    <option value="₹">INR (₹)</option>
                     <option value="$">USD ($)</option>
                     <option value="€">EUR (€)</option>
                     <option value="£">GBP (£)</option>
@@ -204,6 +209,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </button>
             </div>
           </form>
+
+          {currentUser.role === 'Fleet Manager' && (
+            <div className="glass-card rounded-2xl p-6 border border-brand-outline space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-brand-outline/40">
+                <ShieldAlert className="h-5 w-5 text-amber-400" />
+                <h3 className="text-md font-display font-semibold text-white">Pending Access Requests</h3>
+              </div>
+              
+              {users.filter(u => u.status === 'Pending').length === 0 ? (
+                <div className="text-xs text-brand-secondary p-4 bg-brand-surface rounded-lg border border-brand-outline/30 text-center">
+                  No pending access requests at this time.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {users.filter(u => u.status === 'Pending').map(user => (
+                    <div key={user.email} className="flex items-center justify-between p-3 bg-brand-surface rounded-xl border border-brand-outline/40">
+                      <div className="flex items-center gap-3">
+                        <img src={user.avatarUrl} alt={user.name} className="h-10 w-10 rounded-full border-2 border-brand-primary/30" />
+                        <div>
+                          <p className="text-sm font-semibold text-white">{user.name}</p>
+                          <p className="text-[10px] text-brand-secondary font-mono">{user.email} • {user.role}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => onUpdateUserStatus?.(user.email, 'Active')}
+                          className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 text-[10px] font-bold uppercase rounded border border-emerald-500/30 transition-colors cursor-pointer"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => onUpdateUserStatus?.(user.email, 'Rejected')}
+                          className="px-3 py-1.5 bg-brand-error/20 hover:bg-brand-error/40 text-brand-error text-[10px] font-bold uppercase rounded border border-brand-error/30 transition-colors cursor-pointer"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Column: Database diagnostics & controls */}

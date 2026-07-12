@@ -39,7 +39,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   onAddFuelLog,
   onAddExpense,
   onApproveFuelLog,
-  currencySymbol = '$',
+  currencySymbol = '₹',
   suspiciousThreshold = 4.5
 }) => {
   const toast = useToast();

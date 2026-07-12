@@ -29,7 +29,7 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
   onAddMaintenance,
   onCompleteMaintenance,
   onUpdateVehicle,
-  currencySymbol = '$'
+  currencySymbol = '₹'
 }) => {
   const toast = useToast();
   const [isAddMaintOpen, setIsAddMaintOpen] = useState(false);

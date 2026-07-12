@@ -42,6 +42,7 @@ enum DriverStatus {
 
 enum TripStatus {
   Draft
+  Assigned
   Dispatched
   Completed
   Cancelled
@@ -80,6 +81,12 @@ enum ExpenseType {
 // Stores user roles (Fleet Manager, Driver, Safety Officer, Financial Analyst)
 // =============================================================================
 
+enum UserStatus {
+  Pending
+  Active
+  Rejected
+}
+
 model Role {
   id          Int      @id @default(autoincrement())
   name        String   @unique
@@ -98,17 +105,18 @@ model Role {
 // =============================================================================
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
   name      String
   password  String
-  avatarUrl String   @map("avatar_url")
-  roleId    Int      @map("role_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  avatarUrl String     @map("avatar_url")
+  roleId    Int        @map("role_id")
+  status    UserStatus @default(Active) @map("status")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
 
   // Relations
-  role      Role     @relation(fields: [roleId], references: [id])
+  role      Role       @relation(fields: [roleId], references: [id])
 
   @@map("users")
 }
@@ -180,6 +188,8 @@ model Trip {
   routeName          String      @map("route_name")
   fuelConsumedLiters Float?      @map("fuel_consumed_liters")
   finalOdometer      Float?      @map("final_odometer")
+  estimatedDurationHrs Float?    @map("estimated_duration_hrs")
+  currentProgress    Int?        @map("current_progress")
   revenue            Float
   date               String
   createdAt          DateTime    @default(now()) @map("created_at")

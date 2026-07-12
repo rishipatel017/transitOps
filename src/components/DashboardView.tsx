@@ -37,6 +37,8 @@ interface DashboardViewProps {
   expenses: Expense[];
   currentRole: Role;
   onNavigate: (tab: string) => void;
+  currencySymbol?: string;
+  currentDriver?: Driver;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -47,7 +49,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   fuel,
   expenses,
   currentRole,
-  onNavigate
+  onNavigate,
+  currencySymbol = '₹',
+  currentDriver
 }) => {
   // Calculations
   const activeVehiclesCount = vehicles.filter(v => v.status !== 'Retired').length;
@@ -113,6 +117,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     name: d.name.split(' ')[0],
     score: d.safetyScore
   }));
+
+  // Driver-specific calculations
+  const driverActiveTrips = trips.filter(t => t.status === 'Assigned' || t.status === 'Dispatched').length;
+  const driverCompletedTrips = trips.filter(t => t.status === 'Completed').length;
+  const driverTotalDistance = trips.filter(t => t.status === 'Completed').reduce((sum, t) => sum + t.plannedDistance, 0);
+  const driverFuelCost = fuel.reduce((sum, f) => sum + f.cost, 0);
+
 
   return (
     <div className="space-y-6" id="dashboard-container">
@@ -201,140 +212,252 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       )}
 
       {/* Grid of KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-grid">
-        {/* Card 1 */}
-        <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300 group" id="kpi-card-1">
-          <div className="p-3 bg-brand-primary/10 rounded-lg text-brand-primary group-hover:bg-brand-primary group-hover:text-black transition-all">
-            <Truck className="h-6 w-6" />
-          </div>
-          <div>
-            <div className="text-xs text-brand-secondary font-mono">ACTIVE FLEET SIZE</div>
-            <div className="text-2xl font-display font-bold text-white mt-1">
-              {activeVehiclesCount} <span className="text-xs text-brand-secondary font-normal">assets</span>
+      {currentRole === 'Driver' ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" id="driver-kpi-grid">
+          {/* Driver Card 1 */}
+          <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300">
+            <div className="p-3 bg-brand-primary/10 rounded-lg text-brand-primary">
+              <Navigation className="h-6 w-6" />
             </div>
-            <div className="text-[10px] text-emerald-400 font-mono mt-0.5 flex items-center gap-1">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              {onTripCount} deployed on trips
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2 */}
-        <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300 group" id="kpi-card-2">
-          <div className="p-3 bg-brand-tertiary/10 rounded-lg text-brand-tertiary group-hover:bg-brand-tertiary group-hover:text-black transition-all">
-            <Users className="h-6 w-6" />
-          </div>
-          <div>
-            <div className="text-xs text-brand-secondary font-mono">DRIVER FORCE</div>
-            <div className="text-2xl font-display font-bold text-white mt-1">
-              {drivers.length} <span className="text-xs text-brand-secondary font-normal">registered</span>
-            </div>
-            {expiredLicenses > 0 ? (
-              <div className="text-[10px] text-brand-error font-mono mt-0.5 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3 shrink-0" />
-                {expiredLicenses} license alert(s)
+            <div>
+              <div className="text-xs text-brand-secondary font-mono">ACTIVE ASSIGNMENTS</div>
+              <div className="text-2xl font-display font-bold text-white mt-1">
+                {driverActiveTrips} <span className="text-xs text-brand-secondary font-normal">trips</span>
               </div>
-            ) : (
               <div className="text-[10px] text-emerald-400 font-mono mt-0.5 flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                100% Safety compliant
+                {driverActiveTrips > 0 ? 'Action Required' : 'All caught up'}
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
-        {/* Card 3 */}
-        <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300 group" id="kpi-card-3">
-          <div className="p-3 bg-brand-primary-container/10 rounded-lg text-brand-primary-container group-hover:bg-brand-primary-container group-hover:text-black transition-all">
-            <Navigation className="h-6 w-6" />
-          </div>
-          <div>
-            <div className="text-xs text-brand-secondary font-mono">TRANSIT ACTIVE / DONE</div>
-            <div className="text-2xl font-display font-bold text-white mt-1">
-              {dispatchedTrips} <span className="text-xs text-brand-secondary font-normal">/ {completedTrips}</span>
+          {/* Driver Card 2 */}
+          <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300">
+            <div className="p-3 bg-brand-tertiary/10 rounded-lg text-brand-tertiary">
+              <Compass className="h-6 w-6" />
             </div>
-            <div className="text-[10px] text-brand-secondary font-mono mt-0.5">
-              Total {trips.length} orders logged
+            <div>
+              <div className="text-xs text-brand-secondary font-mono">TOTAL DISTANCE</div>
+              <div className="text-2xl font-display font-bold text-white mt-1">
+                {driverTotalDistance.toLocaleString()} <span className="text-xs text-brand-secondary font-normal">km</span>
+              </div>
+              <div className="text-[10px] text-brand-secondary font-mono mt-0.5">
+                From {driverCompletedTrips} completed trips
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Card 4 */}
-        <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300 group" id="kpi-card-4">
-          <div className="p-3 bg-brand-secondary/10 rounded-lg text-brand-secondary group-hover:bg-brand-secondary group-hover:text-black transition-all">
-            <DollarSign className="h-6 w-6" />
-          </div>
-          <div>
-            <div className="text-xs text-brand-secondary font-mono">OPERATIONAL ROI</div>
-            <div className="text-2xl font-display font-bold text-white mt-1">
-              {netROI}%
+          {/* Driver Card 3 */}
+          <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300">
+            <div className="p-3 bg-brand-primary-container/10 rounded-lg text-brand-primary-container">
+              <CheckCircle2 className="h-6 w-6" />
             </div>
-            <div className="text-[10px] text-emerald-400 font-mono mt-0.5">
-              Net Profit: ${Math.max(0, totalRevenue - totalExpense).toLocaleString()}
+            <div>
+              <div className="text-xs text-brand-secondary font-mono">MY SAFETY SCORE</div>
+              <div className="text-2xl font-display font-bold text-white mt-1">
+                {currentDriver?.safetyScore || 'N/A'} <span className="text-xs text-brand-secondary font-normal">/ 100</span>
+              </div>
+              <div className="text-[10px] text-brand-secondary font-mono mt-0.5">
+                Rating from dispatch
+              </div>
+            </div>
+          </div>
+
+          {/* Driver Card 4 */}
+          <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300">
+            <div className="p-3 bg-brand-secondary/10 rounded-lg text-brand-secondary">
+              <DollarSign className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-xs text-brand-secondary font-mono">MY FUEL LOGGED</div>
+              <div className="text-2xl font-display font-bold text-white mt-1">
+                {currencySymbol}{driverFuelCost.toLocaleString()}
+              </div>
+              <div className="text-[10px] text-emerald-400 font-mono mt-0.5 flex items-center gap-1">
+                Approved logs
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-grid">
+          {/* Card 1 */}
+          <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300 group" id="kpi-card-1">
+            <div className="p-3 bg-brand-primary/10 rounded-lg text-brand-primary group-hover:bg-brand-primary group-hover:text-black transition-all">
+              <Truck className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-xs text-brand-secondary font-mono">ACTIVE FLEET SIZE</div>
+              <div className="text-2xl font-display font-bold text-white mt-1">
+                {activeVehiclesCount} <span className="text-xs text-brand-secondary font-normal">assets</span>
+              </div>
+              <div className="text-[10px] text-emerald-400 font-mono mt-0.5 flex items-center gap-1">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                {onTripCount} deployed on trips
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2 */}
+          <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300 group" id="kpi-card-2">
+            <div className="p-3 bg-brand-tertiary/10 rounded-lg text-brand-tertiary group-hover:bg-brand-tertiary group-hover:text-black transition-all">
+              <Users className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-xs text-brand-secondary font-mono">DRIVER FORCE</div>
+              <div className="text-2xl font-display font-bold text-white mt-1">
+                {drivers.length} <span className="text-xs text-brand-secondary font-normal">registered</span>
+              </div>
+              {expiredLicenses > 0 ? (
+                <div className="text-[10px] text-brand-error font-mono mt-0.5 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                  {expiredLicenses} license alert(s)
+                </div>
+              ) : (
+                <div className="text-[10px] text-emerald-400 font-mono mt-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  100% Safety compliant
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card 3 */}
+          <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300 group" id="kpi-card-3">
+            <div className="p-3 bg-brand-primary-container/10 rounded-lg text-brand-primary-container group-hover:bg-brand-primary-container group-hover:text-black transition-all">
+              <Navigation className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-xs text-brand-secondary font-mono">TRANSIT ACTIVE / DONE</div>
+              <div className="text-2xl font-display font-bold text-white mt-1">
+                {dispatchedTrips} <span className="text-xs text-brand-secondary font-normal">/ {completedTrips}</span>
+              </div>
+              <div className="text-[10px] text-brand-secondary font-mono mt-0.5">
+                Total {trips.length} orders logged
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4 */}
+          <div className="glass-card p-5 rounded-xl flex items-center gap-4 hover:border-brand-primary/40 transition-all duration-300 group" id="kpi-card-4">
+            <div className="p-3 bg-brand-secondary/10 rounded-lg text-brand-secondary group-hover:bg-brand-secondary group-hover:text-black transition-all">
+              <DollarSign className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-xs text-brand-secondary font-mono">OPERATIONAL ROI</div>
+              <div className="text-2xl font-display font-bold text-white mt-1">
+                {netROI}%
+              </div>
+              <div className="text-[10px] text-emerald-400 font-mono mt-0.5">
+                Net Profit: {currencySymbol}{Math.max(0, totalRevenue - totalExpense).toLocaleString()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Role-tailored Dashboards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="dashboard-charts-grid">
         
         {/* Left 2 Columns: Visual Performance charts */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Chart 1: Financial Breakdown */}
-          <div className="glass-card p-5 rounded-xl border border-brand-outline" id="chart-card-financials">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h3 className="text-lg font-display font-semibold text-white">Asset Operational Expense</h3>
-                <p className="text-xs text-brand-secondary">Combines fuel fill logs and routine/active maintenance work logs</p>
+          {currentRole === 'Driver' ? (
+            <div className="glass-card p-5 rounded-xl border border-brand-outline h-full" id="driver-recent-activity">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-lg font-display font-semibold text-white">My Operations Log</h3>
+                  <p className="text-xs text-brand-secondary">Recent trips and route assignments</p>
+                </div>
+                <button 
+                  onClick={() => onNavigate('trips')}
+                  className="text-xs text-brand-primary font-mono hover:underline"
+                >
+                  View all trips &rarr;
+                </button>
               </div>
-              <span className="text-xs font-mono px-2 py-1 bg-brand-surface rounded text-brand-primary">LIFETIME COSTS</span>
+              <div className="space-y-3">
+                {trips.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-brand-secondary">No recent trips found.</div>
+                ) : (
+                  [...trips].reverse().slice(0, 5).map(trip => {
+                    const vehicle = vehicles.find(v => v.registrationNumber === trip.vehicleId);
+                    return (
+                      <div key={trip.id} className="p-4 bg-brand-surface rounded-lg border border-brand-outline/40 flex justify-between items-center">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-mono text-brand-primary">{trip.id}</span>
+                            <span className="text-[9px] font-mono bg-brand-surface-high px-1.5 py-0.5 rounded uppercase">{trip.status}</span>
+                          </div>
+                          <div className="text-sm font-semibold text-white">{trip.source} &rarr; {trip.destination}</div>
+                          <div className="text-xs text-brand-secondary mt-1">{vehicle?.nickname || trip.vehicleId} • {trip.date}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-bold text-white">{trip.plannedDistance} km</div>
+                          <div className="text-xs text-emerald-400 mt-1">+{currencySymbol}{trip.revenue.toLocaleString()}</div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={vehicleFinancials} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
-                  <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0c1929', borderColor: '#334155', borderRadius: '8px' }} 
-                    labelStyle={{ color: '#fff', fontFamily: 'Lexend' }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'Inter' }} />
-                  <Bar dataKey="Fuel" name="Fuel Cost ($)" fill="#f5a623" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Maintenance" name="Maintenance ($)" fill="#ffc880" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          ) : (
+            <>
+              {/* Chart 1: Financial Breakdown */}
+              <div className="glass-card p-5 rounded-xl border border-brand-outline" id="chart-card-financials">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-lg font-display font-semibold text-white">Asset Operational Expense</h3>
+                    <p className="text-xs text-brand-secondary">Combines fuel fill logs and routine/active maintenance work logs</p>
+                  </div>
+                  <span className="text-xs font-mono px-2 py-1 bg-brand-surface rounded text-brand-primary">LIFETIME COSTS</span>
+                </div>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={vehicleFinancials} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                      <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
+                      <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0c1929', borderColor: '#334155', borderRadius: '8px' }} 
+                        labelStyle={{ color: '#fff', fontFamily: 'Lexend' }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'Inter' }} />
+                      <Bar dataKey="Fuel" name={`Fuel Cost (${currencySymbol})`} fill="#f5a623" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Maintenance" name={`Maintenance (${currencySymbol})`} fill="#ffc880" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
 
-          {/* Chart 2: Drivers safety score rating list */}
-          <div className="glass-card p-5 rounded-xl border border-brand-outline" id="chart-card-safety">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-lg font-display font-semibold text-white">Driver Performance Metrics</h3>
-                <p className="text-xs text-brand-secondary">Dynamic safety ratings tracked via dispatcher feedbacks and telematics</p>
+              {/* Chart 2: Drivers safety score rating list */}
+              <div className="glass-card p-5 rounded-xl border border-brand-outline" id="chart-card-safety">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-lg font-display font-semibold text-white">Driver Performance Metrics</h3>
+                    <p className="text-xs text-brand-secondary">Dynamic safety ratings tracked via dispatcher feedbacks and telematics</p>
+                  </div>
+                  <button 
+                    onClick={() => onNavigate('drivers')}
+                    className="text-xs text-brand-primary font-mono hover:underline flex items-center gap-1"
+                  >
+                    Go to compliance console &rarr;
+                  </button>
+                </div>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={safetyData} margin={{ top: 10, right: 20, left: -20, bottom: 5 }}>
+                      <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
+                      <YAxis domain={[0, 100]} stroke="#64748b" fontSize={11} tickLine={false} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0c1929', borderColor: '#334155', borderRadius: '8px' }}
+                        labelStyle={{ color: '#fff' }}
+                      />
+                      <Line type="monotone" dataKey="score" name="Safety Score (0-100)" stroke="#38bdf8" strokeWidth={3} activeDot={{ r: 8 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-              <button 
-                onClick={() => onNavigate('drivers')}
-                className="text-xs text-brand-primary font-mono hover:underline flex items-center gap-1"
-              >
-                Go to compliance console &rarr;
-              </button>
-            </div>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={safetyData} margin={{ top: 10, right: 20, left: -20, bottom: 5 }}>
-                  <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
-                  <YAxis domain={[0, 100]} stroke="#64748b" fontSize={11} tickLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0c1929', borderColor: '#334155', borderRadius: '8px' }}
-                    labelStyle={{ color: '#fff' }}
-                  />
-                  <Line type="monotone" dataKey="score" name="Safety Score (0-100)" stroke="#38bdf8" strokeWidth={3} activeDot={{ r: 8 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+            </>
+          )}
         </div>
 
         {/* Right Column: Key details / Distribution and Recent Trips activity */}

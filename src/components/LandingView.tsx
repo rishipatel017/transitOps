@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Vehicle, Driver, Trip, MaintenanceLog, FuelLog, Expense } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Chatbot } from './Chatbot';
+import { generateOtp, sendOtpEmail } from '../emailService';
 import { 
   Activity, 
   ArrowRight, 
@@ -21,7 +22,10 @@ import {
   AlertCircle, 
   Eye, 
   EyeOff,
-  Sparkles
+  Sparkles,
+  KeyRound,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 
 interface LandingViewProps {
@@ -53,8 +57,43 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<User['role']>('Driver');
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // OTP state
+  const [otpStep, setOtpStep] = useState(false);          // whether we are on OTP step
+  const [otpCode, setOtpCode] = useState('');             // what user types
+  const [otpExpected, setOtpExpected] = useState('');     // what was generated
+  const [otpCountdown, setOtpCountdown] = useState(300);  // 5 min
+  const [otpSending, setOtpSending] = useState(false);
+  const [pendingUser, setPendingUser] = useState<User | null>(null); // user awaiting OTP
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Countdown timer for OTP
+  useEffect(() => {
+    if (otpStep) {
+      setOtpCountdown(300);
+      countdownRef.current = setInterval(() => {
+        setOtpCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownRef.current!);
+            setOtpStep(false);
+            setError('OTP expired. Please try logging in again.');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    }
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, [otpStep]);
+
+  const formatCountdown = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   // Derive dynamic stats from the local "database" (state)
   const activeDispatchesCount = trips.filter(t => t.status === 'Dispatched').length;
@@ -72,13 +111,19 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
   const handleOpenLogin = () => {
     setIsRegistering(false);
+    setOtpStep(false);
+    setOtpCode('');
+    setPendingUser(null);
     setError(null);
+    setSuccess(null);
     setIsLoginModalOpen(true);
   };
 
   const handleOpenRegister = () => {
     setIsRegistering(true);
+    setOtpStep(false);
     setError(null);
+    setSuccess(null);
     setIsLoginModalOpen(true);
   };
 
@@ -91,6 +136,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
 
     if (isRegistering) {
       if (!name.trim()) {
@@ -112,18 +158,19 @@ export const LandingView: React.FC<LandingViewProps> = ({
         return;
       }
 
-      const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
+      const finalAvatarUrl = avatarUrl.trim() || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
       const newUser: User = {
         email: email.trim().toLowerCase(),
         name: name.trim(),
         role,
-        avatarUrl,
-        password
+        avatarUrl: finalAvatarUrl,
+        password,
+        status: 'Pending'
       };
 
       onRegister(newUser);
-      onLogin(newUser);
-      setIsLoginModalOpen(false);
+      setIsRegistering(false);
+      setSuccess('Registration submitted successfully. Your account is pending Fleet Manager approval.');
     } else {
       if (!email.trim()) {
         setError('Please enter your email');
@@ -139,12 +186,57 @@ export const LandingView: React.FC<LandingViewProps> = ({
       );
 
       if (targetUser) {
-        onLogin(targetUser);
-        setIsLoginModalOpen(false);
+        if (targetUser.status === 'Pending') {
+          setError('Access Denied: Your account is still pending approval.');
+          return;
+        }
+        if (targetUser.status === 'Rejected') {
+          setError('Access Denied: Your account request was rejected.');
+          return;
+        }
+        // Credentials valid — trigger OTP
+        triggerOtp(targetUser);
       } else {
         setError('Invalid email or password. Use demo credentials below for rapid entry.');
       }
     }
+  };
+
+  const triggerOtp = async (user: User) => {
+    setOtpSending(true);
+    setError(null);
+    const otp = generateOtp();
+    setOtpExpected(otp);
+    setPendingUser(user);
+    const sent = await sendOtpEmail(user.email, otp);
+    setOtpSending(false);
+    if (sent) {
+      setOtpStep(true);
+      setOtpCode('');
+    } else {
+      // If email failed (misconfiguration), still allow login via console warning
+      console.warn('OTP email failed to send — bypassing for dev mode.');
+      setOtpStep(true);
+      setOtpCode('');
+      setError('OTP email could not be delivered. Check your inbox or use the dev console for the code.');
+    }
+  };
+
+  const handleVerifyOtp = () => {
+    setError(null);
+    if (otpCode.trim() === otpExpected) {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      setOtpStep(false);
+      onLogin(pendingUser!);
+      setIsLoginModalOpen(false);
+    } else {
+      setError('Incorrect OTP. Please check your email and try again.');
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!pendingUser) return;
+    await triggerOtp(pendingUser);
   };
 
   return (
@@ -546,16 +638,18 @@ export const LandingView: React.FC<LandingViewProps> = ({
               {/* Login Modal Header */}
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-xl bg-brand-primary/10 border border-brand-primary/30 flex items-center justify-center text-brand-primary">
-                  <Activity className="h-5 w-5 animate-pulse" />
+                  {otpStep ? <KeyRound className="h-5 w-5 animate-pulse" /> : <Activity className="h-5 w-5 animate-pulse" />}
                 </div>
                 <div>
                   <h3 className="text-lg font-display font-bold text-white">
-                    {isRegistering ? 'Register System Operator' : 'Access System Control'}
+                    {otpStep ? 'Verify Your Identity' : isRegistering ? 'Register System Operator' : 'Access System Control'}
                   </h3>
                   <p className="text-[11px] text-brand-secondary">
-                    {isRegistering 
-                      ? 'Input credentials to enlist a new authorized system operator' 
-                      : 'Enter secure credentials below to mount your dashboard perspective'
+                    {otpStep
+                      ? `A 6-digit code was sent to ${pendingUser?.email}`
+                      : isRegistering
+                        ? 'Input credentials to enlist a new authorized system operator'
+                        : 'Enter secure credentials below to mount your dashboard perspective'
                     }
                   </p>
                 </div>
@@ -568,135 +662,241 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 </div>
               )}
 
-              {/* Forms */}
-              <form onSubmit={handleSubmit} className="space-y-4" id="modal-auth-form">
-                {isRegistering && (
-                  <div>
-                    <label className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest block mb-1.5">FULL OPERATOR NAME</label>
-                    <div className="relative">
-                      <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-secondary" />
-                      <input
-                        type="text"
-                        placeholder="Jameson Vance"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-[#020b14] text-white text-xs pl-10 pr-4 py-3 rounded-xl border border-brand-outline focus:border-brand-primary outline-none transition-all"
-                        id="modal-input-name"
-                      />
+              {success && (
+                <div className="p-3 mb-4 bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 rounded-xl flex items-start gap-2.5 text-xs" id="modal-success-banner">
+                  <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{success}</span>
+                </div>
+              )}
+
+              {/* ── OTP Verification Step ── */}
+              {otpStep ? (
+                <div className="space-y-5" id="otp-verification-panel">
+                  {/* Progress Steps */}
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-brand-secondary mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                      <span className="text-emerald-400">Credentials Verified</span>
+                    </div>
+                    <div className="flex-1 h-px bg-brand-outline" />
+                    <div className="flex items-center gap-1.5">
+                      <KeyRound className="h-3.5 w-3.5 text-brand-primary animate-pulse" />
+                      <span className="text-white">OTP Verification</span>
                     </div>
                   </div>
-                )}
 
-                <div>
-                  <label className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest block mb-1.5">EMAIL ADDRESS</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-secondary" />
-                    <input
-                      type="email"
-                      placeholder="manager@transitops.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-[#020b14] text-white text-xs pl-10 pr-4 py-3 rounded-xl border border-brand-outline focus:border-brand-primary outline-none transition-all"
-                      id="modal-input-email"
-                    />
+                  {/* OTP Input */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest">
+                        ENTER 6-DIGIT OTP
+                      </label>
+                      <span className={`text-[10px] font-mono font-bold ${otpCountdown < 60 ? 'text-brand-error animate-pulse' : 'text-brand-secondary'}`}>
+                        ⏱ {formatCountdown(otpCountdown)}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-secondary" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="● ● ● ● ● ●"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        onKeyDown={(e) => e.key === 'Enter' && handleVerifyOtp()}
+                        className="w-full bg-[#020b14] text-white text-2xl font-mono tracking-[0.5rem] text-center pl-10 pr-4 py-4 rounded-xl border border-brand-outline focus:border-brand-primary outline-none transition-all"
+                        id="otp-input"
+                        autoFocus
+                      />
+                    </div>
+                    <p className="text-[10px] text-brand-secondary mt-1.5">Check your email inbox. The code expires in 5 minutes.</p>
                   </div>
-                </div>
 
-                <div>
-                  <label className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest block mb-1.5">PASSWORD</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-secondary" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-[#020b14] text-white text-xs pl-10 pr-10 py-3 rounded-xl border border-brand-outline focus:border-brand-primary outline-none transition-all"
-                      id="modal-input-password"
-                    />
+                  {/* Verify Button */}
+                  <button
+                    onClick={handleVerifyOtp}
+                    disabled={otpCode.length !== 6}
+                    className="w-full bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold uppercase tracking-wider text-xs py-3.5 rounded-xl transition-all shadow-lg shadow-brand-primary/15 flex items-center justify-center gap-1.5 cursor-pointer"
+                    id="otp-verify-btn"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Verify & Access Dashboard</span>
+                  </button>
+
+                  {/* Resend */}
+                  <div className="text-center">
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-secondary hover:text-white transition-all"
-                      id="modal-password-visibility-toggle"
+                      onClick={handleResendOtp}
+                      disabled={otpSending}
+                      className="text-[11px] text-brand-secondary hover:text-brand-primary flex items-center gap-1.5 mx-auto transition-colors disabled:opacity-50 cursor-pointer"
+                      id="otp-resend-btn"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {otpSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      {otpSending ? 'Sending...' : 'Resend OTP'}
                     </button>
                   </div>
                 </div>
-
-                {isRegistering && (
-                  <div>
-                    <label className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest block mb-2">CLEARANCE ROLE LEVEL</label>
-                    <div className="grid grid-cols-2 gap-2" id="modal-role-grid">
-                      {(['Fleet Manager', 'Driver', 'Safety Officer', 'Financial Analyst'] as const).map((r) => (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => setRole(r)}
-                          className={`py-2 px-3 rounded-xl border text-[11px] font-semibold text-left flex items-center justify-between transition-all ${
-                            role === r 
-                              ? 'bg-brand-primary/10 border-brand-primary text-white' 
-                              : 'bg-[#020b14] border-brand-outline hover:border-brand-outline/85 text-brand-secondary'
-                          }`}
-                        >
-                          <span>{r}</span>
-                          {role === r && <Shield className="h-3 w-3 text-brand-primary" />}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="w-full bg-brand-primary hover:bg-brand-primary/90 text-black font-bold uppercase tracking-wider text-xs py-3.5 rounded-xl transition-all shadow-lg shadow-brand-primary/15 flex items-center justify-center gap-1.5 mt-4 cursor-pointer"
-                  id="modal-submit-btn"
-                >
-                  <span>{isRegistering ? 'Register & Load Workspace' : 'Mount Operational Interface'}</span>
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </form>
-
-              {/* Toggle text */}
-              <div className="text-center mt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRegistering(!isRegistering);
-                    setError(null);
-                  }}
-                  className="text-[11px] text-brand-primary hover:underline uppercase tracking-wide cursor-pointer"
-                >
-                  {isRegistering ? 'Already have an operator profile? Sign In' : 'Need clearance? Register a profile'}
-                </button>
-              </div>
-
-              {/* Demo accounts selector for reviewer convenience */}
-              {!isRegistering && (
-                <div className="mt-6 pt-5 border-t border-brand-outline/40" id="modal-demo-passes">
-                  <span className="text-[10px] font-mono font-bold text-brand-primary uppercase tracking-widest block mb-2.5">DEMO RECTOR PASSES (CLICK TO AUTOFill)</span>
-                  <div className="grid grid-cols-2 gap-2" id="modal-passes-grid">
-                    {users.map((usr) => (
-                      <button
-                        key={usr.email}
-                        type="button"
-                        onClick={() => handleQuickLogin(usr)}
-                        className="p-2 bg-[#020b14] rounded-xl border border-brand-outline/50 hover:border-brand-primary/30 text-left transition-all group flex items-center gap-2.5 cursor-pointer"
-                      >
-                        <img 
-                          src={usr.avatarUrl} 
-                          alt={usr.name} 
-                          className="w-6 h-6 rounded-full border border-brand-outline object-cover" 
-                        />
-                        <div className="overflow-hidden">
-                          <div className="text-[10px] font-bold text-white truncate group-hover:text-brand-primary transition-colors">{usr.name}</div>
-                          <div className="text-[8px] font-mono text-gray-500 uppercase">{usr.role}</div>
+              ) : (
+                <>
+                  {/* ── Login / Register Form ── */}
+                  <form onSubmit={handleSubmit} className="space-y-4" id="modal-auth-form">
+                    {isRegistering && (
+                      <>
+                        <div>
+                          <label className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest block mb-1.5">FULL OPERATOR NAME</label>
+                          <div className="relative">
+                            <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-secondary" />
+                            <input
+                              type="text"
+                              placeholder="Jameson Vance"
+                              value={name}
+                              onChange={(e) => setName(e.target.value)}
+                              className="w-full bg-[#020b14] text-white text-xs pl-10 pr-4 py-3 rounded-xl border border-brand-outline focus:border-brand-primary outline-none transition-all"
+                              id="modal-input-name"
+                            />
+                          </div>
                         </div>
-                      </button>
-                    ))}
+                        <div>
+                          <label className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest block mb-1.5">PROFILE PICTURE URL (OPTIONAL)</label>
+                          <div className="relative">
+                            <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-secondary" />
+                            <input
+                              type="url"
+                              placeholder="https://example.com/avatar.jpg"
+                              value={avatarUrl}
+                              onChange={(e) => setAvatarUrl(e.target.value)}
+                              className="w-full bg-[#020b14] text-white text-xs pl-10 pr-4 py-3 rounded-xl border border-brand-outline focus:border-brand-primary outline-none transition-all"
+                              id="modal-input-avatar"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    <div>
+                      <label className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest block mb-1.5">EMAIL ADDRESS</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-secondary" />
+                        <input
+                          type="email"
+                          placeholder="manager@transitops.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="w-full bg-[#020b14] text-white text-xs pl-10 pr-4 py-3 rounded-xl border border-brand-outline focus:border-brand-primary outline-none transition-all"
+                          id="modal-input-email"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest block mb-1.5">PASSWORD</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-secondary" />
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full bg-[#020b14] text-white text-xs pl-10 pr-10 py-3 rounded-xl border border-brand-outline focus:border-brand-primary outline-none transition-all"
+                          id="modal-input-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-secondary hover:text-white transition-all"
+                          id="modal-password-visibility-toggle"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {isRegistering && (
+                      <div>
+                        <label className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest block mb-2">CLEARANCE ROLE LEVEL</label>
+                        <div className="grid grid-cols-2 gap-2" id="modal-role-grid">
+                          {(['Fleet Manager', 'Driver', 'Safety Officer', 'Financial Analyst'] as const).map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => setRole(r)}
+                              className={`py-2 px-3 rounded-xl border text-[11px] font-semibold text-left flex items-center justify-between transition-all ${
+                                role === r
+                                  ? 'bg-brand-primary/10 border-brand-primary text-white'
+                                  : 'bg-[#020b14] border-brand-outline hover:border-brand-outline/85 text-brand-secondary'
+                              }`}
+                            >
+                              <span>{r}</span>
+                              {role === r && <Shield className="h-3 w-3 text-brand-primary" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={otpSending}
+                      className="w-full bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-60 text-black font-bold uppercase tracking-wider text-xs py-3.5 rounded-xl transition-all shadow-lg shadow-brand-primary/15 flex items-center justify-center gap-1.5 mt-4 cursor-pointer"
+                      id="modal-submit-btn"
+                    >
+                      {otpSending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Sending OTP...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{isRegistering ? 'Submit Access Request' : 'Send OTP & Verify'}</span>
+                          <ChevronRight className="h-4 w-4" />
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                  {/* Toggle text */}
+                  <div className="text-center mt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRegistering(!isRegistering);
+                        setError(null);
+                      }}
+                      className="text-[11px] text-brand-primary hover:underline uppercase tracking-wide cursor-pointer"
+                    >
+                      {isRegistering ? 'Already have an operator profile? Sign In' : 'Need clearance? Register a profile'}
+                    </button>
                   </div>
-                </div>
+
+                  {/* Demo accounts selector for reviewer convenience */}
+                  {!isRegistering && (
+                    <div className="mt-6 pt-5 border-t border-brand-outline/40" id="modal-demo-passes">
+                      <span className="text-[10px] font-mono font-bold text-brand-primary uppercase tracking-widest block mb-2.5">DEMO RECTOR PASSES (CLICK TO AUTOFill)</span>
+                      <div className="grid grid-cols-2 gap-2" id="modal-passes-grid">
+                        {users.map((usr) => (
+                          <button
+                            key={usr.email}
+                            type="button"
+                            onClick={() => handleQuickLogin(usr)}
+                            className="p-2 bg-[#020b14] rounded-xl border border-brand-outline/50 hover:border-brand-primary/30 text-left transition-all group flex items-center gap-2.5 cursor-pointer"
+                          >
+                            <img
+                              src={usr.avatarUrl}
+                              alt={usr.name}
+                              className="w-6 h-6 rounded-full border border-brand-outline object-cover"
+                            />
+                            <div className="overflow-hidden">
+                              <div className="text-[10px] font-bold text-white truncate group-hover:text-brand-primary transition-colors">{usr.name}</div>
+                              <div className="text-[8px] font-mono text-gray-500 uppercase">{usr.role}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </motion.div>
           </motion.div>

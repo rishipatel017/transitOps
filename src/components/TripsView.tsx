@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trip, Vehicle, Driver } from '../types';
 import { 
   Plus, 
@@ -12,7 +12,9 @@ import {
   AlertTriangle,
   Info,
   X,
-  Scale
+  MapPin,
+  Clock,
+  Compass
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { ConfirmDialog } from './ui/ConfirmDialog';
@@ -22,7 +24,7 @@ interface TripsViewProps {
   vehicles: Vehicle[];
   drivers: Driver[];
   onAddTrip: (trip: Trip) => void;
-  onDispatchTrip: (id: string) => void;
+  onDispatchTrip: (id: string, routeName?: string, duration?: number) => void;
   onCompleteTrip: (id: string, fuelConsumed: number, finalOdometer: number) => void;
   onCancelTrip: (id: string) => void;
   currentRole?: string;
@@ -38,12 +40,12 @@ export const TripsView: React.FC<TripsViewProps> = ({
   onCompleteTrip,
   onCancelTrip,
   currentRole,
-  currencySymbol = '$'
+  currencySymbol = '₹'
 }) => {
   const toast = useToast();
   const [isNewTripOpen, setIsNewTripOpen] = useState(false);
   const [completingTripId, setCompletingTripId] = useState<string | null>(null);
-  const [abortConfirm, setAbortConfirm] = useState<string | null>(null); // tripId to abort
+  const [abortConfirm, setAbortConfirm] = useState<string | null>(null);
 
   // Form states - New Trip
   const [source, setSource] = useState('');
@@ -59,15 +61,18 @@ export const TripsView: React.FC<TripsViewProps> = ({
   const [fuelConsumed, setFuelConsumed] = useState(50);
   const [finalOdometer, setFinalOdometer] = useState(0);
 
+  // Form states - Driver Acceptance
+  const [acceptingTripId, setAcceptingTripId] = useState<string | null>(null);
+  const [selectedRouteOption, setSelectedRouteOption] = useState<number | null>(null);
+
   // Filter state
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Draft' | 'Dispatched' | 'Completed' | 'Cancelled'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Draft' | 'Assigned' | 'Dispatched' | 'Completed' | 'Cancelled'>('All');
 
   // Error messaging for validation
   const [errorMsg, setErrorMsg] = useState('');
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Validation function for new trip creation
   const handleCreateTripSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -85,36 +90,31 @@ export const TripsView: React.FC<TripsViewProps> = ({
       return;
     }
 
-    // Rule 1: Vehicle availability
     if (vehicle.status !== 'Available') {
-      setErrorMsg(`Vehicle ${vehicle.registrationNumber} (${vehicle.nickname || vehicle.name}) is current classified as "${vehicle.status}". It is unavailable for dispatch.`);
+      setErrorMsg(`Vehicle ${vehicle.registrationNumber} is currently classified as "${vehicle.status}". It is unavailable.`);
       return;
     }
 
-    // Rule 2: Driver availability & license sanity
     if (driver.status !== 'Available') {
-      setErrorMsg(`Driver ${driver.name} is currently classified as "${driver.status}". They are unavailable for this trip.`);
+      setErrorMsg(`Driver ${driver.name} is currently classified as "${driver.status}". They are unavailable.`);
       return;
     }
 
-    // Rule 3: Cargo weight capacity check
     if (Number(cargoWeight) > vehicle.maxCapacity) {
-      setErrorMsg(`Capacity Exceeded! The cargo weight (${cargoWeight.toLocaleString()} kg) exceeds the vehicle's maximum registered load limit (${vehicle.maxCapacity.toLocaleString()} kg).`);
+      setErrorMsg(`Capacity Exceeded! The cargo weight (${cargoWeight.toLocaleString()} kg) exceeds max limit (${vehicle.maxCapacity.toLocaleString()} kg).`);
       return;
     }
 
-    // Rule 4: Driver License Category match
     const needsHMV = vehicle.type === 'Truck';
     const hasHMV = driver.licenseCategory === 'HMV';
     if (needsHMV && !hasHMV) {
-      setErrorMsg(`Safety Violation! Deployed asset requires a heavy transport operator (HMV). ${driver.name} only holds an LMV permit.`);
+      setErrorMsg(`Safety Violation! Requires HMV. ${driver.name} only holds an LMV permit.`);
       return;
     }
 
-    // Rule 5: Driver License Expiry check
     const isExpired = new Date(driver.licenseExpiryDate) < new Date(todayStr);
     if (isExpired) {
-      setErrorMsg(`Compliance Violation! ${driver.name}'s operating license expired on ${driver.licenseExpiryDate}. Dispatch blocked by regulatory authority.`);
+      setErrorMsg(`Compliance Violation! ${driver.name}'s license expired on ${driver.licenseExpiryDate}.`);
       return;
     }
 
@@ -126,17 +126,18 @@ export const TripsView: React.FC<TripsViewProps> = ({
       driverId: selectedDriverId,
       cargoWeight: Number(cargoWeight),
       plannedDistance: Number(plannedDistance),
-      status: 'Draft',
-      eta: 'Pending Dispatch',
-      routeName: routeName.trim() || `${source.trim()} to ${destination.trim()}`,
+      status: 'Assigned',
+      eta: 'Pending Acceptance',
+      routeName: routeName.trim(), // Will be updated by Driver
       revenue: Number(estRevenue),
-      date: todayStr
+      date: todayStr,
+      currentProgress: 0,
+      estimatedDurationHrs: 0
     };
 
     onAddTrip(newTrip);
-    toast.success('Trip Created', `Draft trip ${newTrip.id} is ready for dispatch.`);
+    toast.success('Trip Assigned', `Trip ${newTrip.id} has been assigned to driver ${driver.name}.`);
 
-    // Reset Form
     setSource('');
     setDestination('');
     setSelectedVehicleId('');
@@ -151,7 +152,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
   const handleOpenCompleteTripModal = (trip: Trip) => {
     const vehicle = vehicles.find(v => v.registrationNumber === trip.vehicleId);
     setCompletingTripId(trip.id);
-    setFuelConsumed(Math.round(trip.plannedDistance * 0.25)); // Estimate 25 liters per 100km
+    setFuelConsumed(Math.round(trip.plannedDistance * 0.25)); 
     setFinalOdometer((vehicle?.odometer || 0) + trip.plannedDistance);
   };
 
@@ -164,17 +165,21 @@ export const TripsView: React.FC<TripsViewProps> = ({
 
     const vehicle = vehicles.find(v => v.registrationNumber === trip.vehicleId);
     if (vehicle && Number(finalOdometer) < vehicle.odometer) {
-      toast.error(
-        'Invalid Odometer Reading',
-        `Final odometer (${Number(finalOdometer).toLocaleString()} km) cannot be less than starting odometer (${vehicle.odometer.toLocaleString()} km).`
-      );
+      toast.error('Invalid Odometer', `Final odometer cannot be less than starting (${vehicle.odometer.toLocaleString()} km).`);
       return;
     }
 
     onCompleteTrip(completingTripId, Number(fuelConsumed), Number(finalOdometer));
-    toast.success('Trip Completed', `Transit ${completingTripId} settled. Vehicle and driver are now available.`);
+    toast.success('Trip Completed', `Transit ${completingTripId} settled.`);
     setCompletingTripId(null);
   };
+
+  // Mock Route Data Generator for Driver Acceptance
+  const getMockRoutes = (trip: Trip) => [
+    { id: 1, name: 'Expressway Route (Fastest)', duration: Math.max(1, trip.plannedDistance / 60).toFixed(1), distance: trip.plannedDistance },
+    { id: 2, name: 'State Highway (Fuel Efficient)', duration: Math.max(1.5, trip.plannedDistance / 45).toFixed(1), distance: trip.plannedDistance * 1.1 },
+    { id: 3, name: 'Scenic/Avoid Tolls', duration: Math.max(2, trip.plannedDistance / 40).toFixed(1), distance: trip.plannedDistance * 1.3 }
+  ];
 
   const filteredTrips = trips.filter(t => statusFilter === 'All' || t.status === statusFilter);
 
@@ -185,7 +190,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4" id="trips-header">
         <div>
           <h2 className="text-2xl font-display font-bold text-white tracking-tight">Trip Dispatch Center</h2>
-          <p className="text-xs text-brand-secondary">Configure source depots, verify load thresholds, perform crew audits, and track route progress.</p>
+          <p className="text-xs text-brand-secondary">Configure source depots, assign drivers, track live routes.</p>
         </div>
         {currentRole !== 'Driver' && (
           <button 
@@ -195,7 +200,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
             }}
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-brand-primary text-black rounded-lg font-semibold font-mono text-xs hover:bg-white transition-all shadow-lg shadow-brand-primary/10"
           >
-            <Plus className="h-4 w-4" /> CREATE TRIP DISPATCH
+            <Plus className="h-4 w-4" /> ASSIGN NEW TRIP
           </button>
         )}
       </div>
@@ -204,8 +209,8 @@ export const TripsView: React.FC<TripsViewProps> = ({
       <div className="p-4 bg-brand-surface rounded-xl border border-brand-outline flex items-center justify-between" id="trips-filters">
         <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
           <span className="text-gray-500 uppercase tracking-wider">Trip State:</span>
-          <div className="flex rounded-md bg-brand-surface-lowest p-1 border border-brand-outline/40">
-            {(['All', 'Draft', 'Dispatched', 'Completed', 'Cancelled'] as const).map(state => (
+          <div className="flex rounded-md bg-brand-surface-lowest p-1 border border-brand-outline/40 overflow-x-auto">
+            {(['All', 'Draft', 'Assigned', 'Dispatched', 'Completed', 'Cancelled'] as const).map(state => (
               <button
                 key={state}
                 onClick={() => setStatusFilter(state)}
@@ -247,7 +252,8 @@ export const TripsView: React.FC<TripsViewProps> = ({
                       {trip.id}
                     </span>
                     <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                      trip.status === 'Draft' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                      trip.status === 'Draft' ? 'bg-gray-500/10 text-gray-400 border border-gray-500/20' :
+                      trip.status === 'Assigned' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                       trip.status === 'Dispatched' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20 animate-pulse' :
                       trip.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                       'bg-rose-500/10 text-rose-400 border border-rose-500/20'
@@ -272,12 +278,43 @@ export const TripsView: React.FC<TripsViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="text-xs font-mono text-gray-400 bg-brand-surface-low/30 p-2.5 rounded-lg border border-brand-outline/20">
-                    <span className="text-brand-secondary uppercase">Active Transit Route:</span> {trip.routeName}
-                  </div>
+                  {trip.routeName && (
+                    <div className="text-xs font-mono text-gray-400 bg-brand-surface-low/30 p-2.5 rounded-lg border border-brand-outline/20">
+                      <span className="text-brand-secondary uppercase">Selected Route:</span> {trip.routeName}
+                    </div>
+                  )}
+
+                  {/* LIVE TRACKING COMPONENT */}
+                  {trip.status === 'Dispatched' && (
+                    <div className="mt-4 p-4 rounded-xl border border-sky-500/30 bg-sky-500/5 relative overflow-hidden">
+                      <div className="flex justify-between items-end mb-2">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-sky-400 animate-bounce" />
+                          <span className="text-xs font-bold text-sky-400 tracking-wide uppercase">Live Location Tracking</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] text-brand-secondary font-mono">
+                          <Clock className="h-3 w-3" />
+                          Est. Duration: {trip.estimatedDurationHrs} hrs
+                        </div>
+                      </div>
+                      
+                      {/* Progress Bar */}
+                      <div className="w-full bg-brand-surface-lowest rounded-full h-2 mb-2 border border-brand-outline/50 relative overflow-hidden">
+                        <div 
+                          className="bg-sky-400 h-2 rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(56,189,248,0.5)]" 
+                          style={{ width: `${trip.currentProgress || 0}%` }}
+                        ></div>
+                      </div>
+                      
+                      <div className="flex justify-between items-center text-[10px] font-mono text-gray-400">
+                        <span>{trip.currentProgress || 0}% Completed</span>
+                        <span>{trip.eta}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Center: Crew / Vehicle Allocation & Validation specs */}
+                {/* Center: Crew / Vehicle */}
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-2 gap-4 w-full lg:w-96 p-4 bg-brand-surface-low/40 rounded-xl border border-brand-outline/20">
                   <div>
                     <span className="text-[10px] text-gray-500 font-mono block">VEHICLE</span>
@@ -314,6 +351,22 @@ export const TripsView: React.FC<TripsViewProps> = ({
 
                 {/* Right: Operational Actions */}
                 <div className="flex lg:flex-col justify-end gap-2 lg:w-48 shrink-0 border-t lg:border-t-0 lg:border-l border-brand-outline/20 pt-4 lg:pt-0 lg:pl-6">
+                  {/* Assigned Status Actions */}
+                  {trip.status === 'Assigned' && (
+                    currentRole === 'Driver' ? (
+                      <button 
+                        onClick={() => setAcceptingTripId(trip.id)}
+                        className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 py-2.5 bg-brand-primary text-black font-semibold rounded-lg text-xs font-mono hover:bg-white transition-all shadow-md shadow-brand-primary/5"
+                      >
+                        <Compass className="h-3.5 w-3.5 fill-black" /> ACCEPT & SELECT ROUTE
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-amber-500 font-mono text-center italic py-2 border border-amber-500/20 bg-amber-500/5 rounded-lg px-2">
+                        Waiting for Driver Acceptance
+                      </span>
+                    )
+                  )}
+
                   {trip.status === 'Draft' && (
                     currentRole !== 'Driver' ? (
                       <button 
@@ -355,7 +408,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
                         <CheckCircle2 className="h-4 w-4" /> Transit Settled
                       </div>
                       <div className="text-gray-500 text-[10px]">
-                        Fuel Consumed: {trip.fuelConsumedLiters}L
+                        Duration: {trip.estimatedDurationHrs} hrs
                       </div>
                       <div className="text-gray-500 text-[10px]">
                         Final Odo: {trip.finalOdometer} km
@@ -375,17 +428,17 @@ export const TripsView: React.FC<TripsViewProps> = ({
         )}
       </div>
 
-      {/* CREATE NEW TRIP DISPATCH MODAL */}
+      {/* CREATE NEW TRIP (ASSIGNMENT) MODAL */}
       {isNewTripOpen && (
         <div className="fixed inset-0 bg-brand-background/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="glass-panel w-full max-w-xl rounded-2xl border border-brand-outline p-6 space-y-4">
             <div className="flex justify-between items-center pb-3 border-b border-brand-outline">
-              <h3 className="text-lg font-display font-bold text-white">Create Trip & Validate Dispatch</h3>
+              <h3 className="text-lg font-display font-bold text-white">Assign New Trip</h3>
               <button onClick={() => setIsNewTripOpen(false)} className="text-brand-secondary hover:text-white">
                 <X className="h-5 w-5" />
               </button>
             </div>
-
+            
             {errorMsg && (
               <div className="p-3 bg-brand-error-container/30 border border-brand-error/50 rounded-lg text-brand-error text-xs font-mono flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -393,90 +446,31 @@ export const TripsView: React.FC<TripsViewProps> = ({
               </div>
             )}
 
-            {/* Validation Rules Indicator */}
-            <div className="p-3 bg-brand-surface-low border border-brand-outline/40 rounded-xl space-y-1">
-              <div className="text-[10px] text-brand-primary font-mono flex items-center gap-1 uppercase font-bold">
-                <Info className="h-3.5 w-3.5" /> Dispatch Verification Checklist:
-              </div>
-              <ul className="text-[10px] text-brand-secondary list-disc list-inside space-y-0.5">
-                <li>Vehicle & Crew must be marked <strong>"Available"</strong>.</li>
-                <li>Cargo weight must not exceed Vehicle max load limit.</li>
-                <li>Driver must hold valid operating permit class (HMV required for Heavy Trucks).</li>
-                <li>Driver license permit must not be expired.</li>
-              </ul>
-            </div>
-
             <form onSubmit={handleCreateTripSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-brand-secondary font-mono mb-1.5 uppercase">Origin Depot *</label>
-                  <input 
-                    type="text" 
-                    value={source}
-                    onChange={(e) => setSource(e.target.value)}
-                    placeholder="e.g. Houston Terminal B"
-                    className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg focus:outline-none focus:border-brand-primary"
-                    required
-                  />
+                  <input type="text" value={source} onChange={(e) => setSource(e.target.value)} placeholder="e.g. Houston Terminal B" className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg focus:outline-none focus:border-brand-primary" required />
                 </div>
                 <div>
                   <label className="block text-brand-secondary font-mono mb-1.5 uppercase">Destination Hub *</label>
-                  <input 
-                    type="text" 
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    placeholder="e.g. Dallas North Hub"
-                    className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg focus:outline-none focus:border-brand-primary"
-                    required
-                  />
+                  <input type="text" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="e.g. Dallas North Hub" className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg focus:outline-none focus:border-brand-primary" required />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-brand-secondary font-mono mb-1.5 uppercase">Select Deployed Vehicle *</label>
-                  <select
-                    value={selectedVehicleId}
-                    onChange={(e) => setSelectedVehicleId(e.target.value)}
-                    className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg font-mono focus:outline-none focus:border-brand-primary"
-                    required
-                  >
+                  <label className="block text-brand-secondary font-mono mb-1.5 uppercase">Select Asset *</label>
+                  <select value={selectedVehicleId} onChange={(e) => setSelectedVehicleId(e.target.value)} className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg font-mono focus:outline-none focus:border-brand-primary" required>
                     <option value="">-- Choose Asset --</option>
-                    {vehicles.filter(v => v.status === 'Available').map(v => (
-                      <option key={v.registrationNumber} value={v.registrationNumber}>
-                        {v.nickname || v.name} ({v.registrationNumber}) [{v.type}]
-                      </option>
-                    ))}
-                    {vehicles.filter(v => v.status !== 'Available').map(v => (
-                      <option key={v.registrationNumber} value={v.registrationNumber} disabled>
-                        ⛔ {v.nickname || v.name} ({v.registrationNumber}) — {v.status.toUpperCase()}
-                      </option>
-                    ))}
+                    {vehicles.filter(v => v.status === 'Available').map(v => <option key={v.registrationNumber} value={v.registrationNumber}>{v.nickname || v.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-brand-secondary font-mono mb-1.5 uppercase">Select Assigned Crew *</label>
-                  <select
-                    value={selectedDriverId}
-                    onChange={(e) => setSelectedDriverId(e.target.value)}
-                    className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg font-mono focus:outline-none focus:border-brand-primary"
-                    required
-                  >
+                  <label className="block text-brand-secondary font-mono mb-1.5 uppercase">Assign Driver *</label>
+                  <select value={selectedDriverId} onChange={(e) => setSelectedDriverId(e.target.value)} className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg font-mono focus:outline-none focus:border-brand-primary" required>
                     <option value="">-- Choose Operator --</option>
-                    {drivers.map(d => {
-                      const isExpired = new Date(d.licenseExpiryDate) < new Date(todayStr);
-                      const isIneligible = d.status !== 'Available' || isExpired;
-                      let flags = '';
-                      if (d.status === 'On Trip') flags = ' [ON TRIP]';
-                      else if (d.status === 'Suspended') flags = ' [SUSPENDED]';
-                      else if (d.status === 'Off Duty') flags = ' [OFF DUTY]';
-                      if (isExpired) flags += ' [EXPIRED LIC.]';
-                      return (
-                        <option key={d.licenseNumber} value={d.licenseNumber} style={isIneligible ? {color: '#f87171'} : {}}>
-                          {isIneligible ? '⚠️ ' : ''}{d.name} ({d.licenseNumber}) [{d.licenseCategory}]{flags}
-                        </option>
-                      );
-                    })}
+                    {drivers.filter(d => d.status === 'Available').map(d => <option key={d.licenseNumber} value={d.licenseNumber}>{d.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -484,60 +478,79 @@ export const TripsView: React.FC<TripsViewProps> = ({
               <div className="grid grid-cols-3 gap-3 font-mono">
                 <div>
                   <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Cargo weight (kg)</label>
-                  <input 
-                    type="number" 
-                    value={cargoWeight}
-                    onChange={(e) => setCargoWeight(Number(e.target.value))}
-                    className="w-full bg-brand-surface border border-brand-outline text-white px-2.5 py-2 rounded-lg focus:outline-none focus:border-brand-primary"
-                  />
+                  <input type="number" value={cargoWeight} onChange={(e) => setCargoWeight(Number(e.target.value))} className="w-full bg-brand-surface border border-brand-outline text-white px-2.5 py-2 rounded-lg" />
                 </div>
                 <div>
-                  <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Est. Distance (km)</label>
-                  <input 
-                    type="number" 
-                    value={plannedDistance}
-                    onChange={(e) => setPlannedDistance(Number(e.target.value))}
-                    className="w-full bg-brand-surface border border-brand-outline text-white px-2.5 py-2 rounded-lg focus:outline-none focus:border-brand-primary"
-                  />
+                  <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Distance (km)</label>
+                  <input type="number" value={plannedDistance} onChange={(e) => setPlannedDistance(Number(e.target.value))} className="w-full bg-brand-surface border border-brand-outline text-white px-2.5 py-2 rounded-lg" />
                 </div>
                 <div>
-                  <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Planned Revenue ({currencySymbol})</label>
-                  <input 
-                    type="number" 
-                    value={estRevenue}
-                    onChange={(e) => setEstRevenue(Number(e.target.value))}
-                    className="w-full bg-brand-surface border border-brand-outline text-white px-2.5 py-2 rounded-lg focus:outline-none focus:border-brand-primary font-bold text-emerald-400"
-                  />
+                  <label className="block text-brand-secondary mb-1 uppercase text-[10px]">Revenue ({currencySymbol})</label>
+                  <input type="number" value={estRevenue} onChange={(e) => setEstRevenue(Number(e.target.value))} className="w-full bg-brand-surface border border-brand-outline text-white px-2.5 py-2 rounded-lg" />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-brand-secondary font-mono mb-1.5 uppercase">Transit Route Name / Details</label>
-                <input 
-                  type="text" 
-                  value={routeName}
-                  onChange={(e) => setRouteName(e.target.value)}
-                  placeholder="e.g. I-45 Northbound Express Lane"
-                  className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg focus:outline-none focus:border-brand-primary"
-                />
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t border-brand-outline/40">
-                <button 
-                  type="button" 
-                  onClick={() => setIsNewTripOpen(false)}
-                  className="px-4 py-2 bg-brand-surface-high text-brand-secondary rounded-lg font-mono hover:text-white transition-all"
-                >
-                  CANCEL
-                </button>
-                <button 
-                  type="submit"
-                  className="px-4 py-2 bg-brand-primary text-black rounded-lg font-mono font-bold hover:bg-white transition-all"
-                >
-                  SAVE DRAFT TRIP
-                </button>
+                <button type="button" onClick={() => setIsNewTripOpen(false)} className="px-4 py-2 bg-brand-surface-high text-brand-secondary rounded-lg font-mono">CANCEL</button>
+                <button type="submit" className="px-4 py-2 bg-brand-primary text-black rounded-lg font-mono font-bold">ASSIGN TRIP</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DRIVER ROUTE SELECTION MODAL */}
+      {acceptingTripId && (
+        <div className="fixed inset-0 bg-brand-background/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="glass-panel w-full max-w-lg rounded-2xl border border-brand-outline p-6 space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-brand-outline">
+              <h3 className="text-lg font-display font-bold text-white">Accept & Select Route</h3>
+              <button onClick={() => { setAcceptingTripId(null); setSelectedRouteOption(null); }} className="text-brand-secondary hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <p className="text-sm text-brand-secondary">Choose the most optimal transit route for this assignment.</p>
+
+            <div className="space-y-3">
+              {getMockRoutes(trips.find(t => t.id === acceptingTripId)!).map(route => (
+                <div 
+                  key={route.id}
+                  onClick={() => setSelectedRouteOption(route.id)}
+                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                    selectedRouteOption === route.id 
+                      ? 'bg-brand-primary/10 border-brand-primary shadow-[0_0_15px_rgba(208,255,0,0.15)]' 
+                      : 'bg-brand-surface border-brand-outline hover:border-brand-secondary/50'
+                  }`}
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <span className={`font-semibold ${selectedRouteOption === route.id ? 'text-brand-primary' : 'text-white'}`}>
+                      {route.name}
+                    </span>
+                    <span className="text-xs font-mono text-gray-400">{route.duration} hrs</span>
+                  </div>
+                  <div className="text-xs text-brand-secondary">Distance: {Math.round(route.distance)} km</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-brand-outline/40">
+              <button onClick={() => { setAcceptingTripId(null); setSelectedRouteOption(null); }} className="px-4 py-2 bg-brand-surface-high text-brand-secondary rounded-lg font-mono">CANCEL</button>
+              <button 
+                disabled={!selectedRouteOption}
+                onClick={() => {
+                  const trip = trips.find(t => t.id === acceptingTripId);
+                  const selected = getMockRoutes(trip!).find(r => r.id === selectedRouteOption);
+                  onDispatchTrip(acceptingTripId, selected?.name, Number(selected?.duration));
+                  toast.success('Trip Accepted', `You are now En Route via ${selected?.name}.`);
+                  setAcceptingTripId(null);
+                  setSelectedRouteOption(null);
+                }} 
+                className="px-4 py-2 bg-brand-primary text-black rounded-lg font-mono font-bold disabled:opacity-50"
+              >
+                START TRANSIT
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -556,48 +569,26 @@ export const TripsView: React.FC<TripsViewProps> = ({
             <form onSubmit={handleCompleteTripSubmit} className="space-y-4 text-xs font-mono">
               <div>
                 <label className="block text-brand-secondary mb-1.5 uppercase">Actual Fuel Consumed (Liters)</label>
-                <input 
-                  type="number" 
-                  value={fuelConsumed}
-                  onChange={(e) => setFuelConsumed(Number(e.target.value))}
-                  className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg focus:outline-none focus:border-brand-primary text-md"
-                  required
-                />
+                <input type="number" value={fuelConsumed} onChange={(e) => setFuelConsumed(Number(e.target.value))} className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg focus:outline-none focus:border-brand-primary text-md" required />
               </div>
 
               <div>
                 <label className="block text-brand-secondary mb-1.5 uppercase">Final Asset Odometer Reading (km)</label>
-                <input 
-                  type="number" 
-                  value={finalOdometer}
-                  onChange={(e) => setFinalOdometer(Number(e.target.value))}
-                  className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg focus:outline-none focus:border-brand-primary text-md font-bold text-brand-primary"
-                  required
-                />
+                <input type="number" value={finalOdometer} onChange={(e) => setFinalOdometer(Number(e.target.value))} className="w-full bg-brand-surface border border-brand-outline text-white px-3 py-2 rounded-lg focus:outline-none focus:border-brand-primary text-md font-bold text-brand-primary" required />
                 <p className="text-[10px] text-gray-500 font-sans mt-1">Starting vehicle odometer was: {
                   vehicles.find(v => v.registrationNumber === trips.find(t => t.id === completingTripId)?.vehicleId)?.odometer.toLocaleString()
                 } km</p>
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t border-brand-outline/40">
-                <button 
-                  type="button" 
-                  onClick={() => setCompletingTripId(null)}
-                  className="px-3 py-1.5 bg-brand-surface-high text-brand-secondary rounded-lg hover:text-white transition-all font-mono"
-                >
-                  CANCEL
-                </button>
-                <button 
-                  type="submit"
-                  className="px-4 py-1.5 bg-emerald-500 text-black rounded-lg font-bold hover:bg-white transition-all font-mono"
-                >
-                  SETTLE TRANSIT
-                </button>
+                <button type="button" onClick={() => setCompletingTripId(null)} className="px-3 py-1.5 bg-brand-surface-high text-brand-secondary rounded-lg hover:text-white transition-all font-mono">CANCEL</button>
+                <button type="submit" className="px-4 py-1.5 bg-emerald-500 text-black rounded-lg font-bold hover:bg-white transition-all font-mono">SETTLE TRANSIT</button>
               </div>
             </form>
           </div>
         </div>
       )}
+
       {/* ABORT TRIP CONFIRM DIALOG */}
       <ConfirmDialog
         isOpen={!!abortConfirm}
@@ -609,7 +600,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
         onConfirm={() => {
           if (abortConfirm) {
             onCancelTrip(abortConfirm);
-            toast.warning('Trip Aborted', `Trip ${abortConfirm} has been cancelled. Vehicle and driver are now available.`);
+            toast.warning('Trip Aborted', `Trip ${abortConfirm} has been cancelled.`);
             setAbortConfirm(null);
           }
         }}
