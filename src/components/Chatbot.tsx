@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquare, X, Send, Mail, Phone, MapPin, Activity } from 'lucide-react';
+import { MessageSquare, X, Send, Activity, Loader2 } from 'lucide-react';
+import { chatWithAI } from '../utils/ai';
 
 interface Message {
   id: string;
@@ -9,8 +10,13 @@ interface Message {
   time: string;
 }
 
-export const Chatbot: React.FC = () => {
+interface ChatbotProps {
+  appState?: any;
+}
+
+export const Chatbot: React.FC<ChatbotProps> = ({ appState }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -27,7 +33,7 @@ export const Chatbot: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
 
@@ -43,43 +49,37 @@ export const Chatbot: React.FC = () => {
 
     setMessages(prev => [...prev, userMsg]);
     setInputValue('');
+    setIsTyping(true);
 
-    // Generate Bot Response after a small delay
-    setTimeout(() => {
-      let responseText = '';
-      const textLower = userMessageText.toLowerCase();
+    try {
+      const history = messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'model', text: m.text })) as {role: 'user'|'model', text: string}[];
+      
+      const systemPrompt = `You are Antigravity, the AI Copilot for TransitOps. You are an expert in fleet management logistics.
+Here is the live JSON snapshot of the fleet's current state (do not expose this JSON raw to the user, just use it to answer their questions accurately):
+${JSON.stringify(appState, null, 2)}
+Keep answers concise, professional, and directly address the user's data when relevant.`;
 
-      if (textLower.includes('how are you')) {
-        responseText = "I'm doing fantastic, running at peak operational efficiency! ⚡ I've been busy helping optimize route schedules and monitoring driver safety scores. How are you doing today?";
-      } else if (
-        textLower.includes('hi') || 
-        textLower.includes('hello') || 
-        textLower.includes('hey') || 
-        textLower.includes('greet')
-      ) {
-        responseText = "Greetings! I'm Antigravity, your dedicated logistics assistant. I'm here to help you coordinate fleet details, find contacts, or walk you through system business rules. What can I help you with?";
-      } else if (
-        textLower.includes('contact') || 
-        textLower.includes('support') || 
-        textLower.includes('phone') || 
-        textLower.includes('email') || 
-        textLower.includes('info') || 
-        textLower.includes('help')
-      ) {
-        responseText = "Here is the official TransitOps support & contact information:\n\n📧 **Email:** support@transitops.com\n📞 **Phone:** +1 (555) 019-2831\n📍 **HQ Depot:** Houston Depot Terminal A\n\nOur operations desk is available 24/7 to clear dispatch flags!";
-      } else {
-        responseText = "I am Antigravity, your AI assistant. You can ask me how I am doing, or ask for the platform's support and contact information!";
-      }
+      const botResponseText = await chatWithAI(systemPrompt, history, userMessageText);
 
       const botMsg: Message = {
         id: `msg-${Date.now()}-bot`,
         sender: 'bot',
-        text: responseText,
+        text: botResponseText,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
       setMessages(prev => [...prev, botMsg]);
-    }, 600);
+    } catch (err) {
+      console.error(err);
+      setMessages(prev => [...prev, {
+        id: `msg-${Date.now()}-err`,
+        sender: 'bot',
+        text: "I'm sorry, I'm having trouble connecting to my AI brain right now. Please make sure the Gemini API key is valid.",
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   return (
@@ -138,6 +138,15 @@ export const Chatbot: React.FC = () => {
                   </span>
                 </div>
               ))}
+              {/* Typing indicator */}
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="bg-brand-surface border border-brand-outline text-brand-secondary rounded-2xl rounded-tl-sm px-4 py-2 text-sm shadow-sm flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                    <span className="text-xs font-mono">Thinking...</span>
+                  </div>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
 

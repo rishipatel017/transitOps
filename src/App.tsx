@@ -664,7 +664,7 @@ function AppInner() {
           )}
         </motion.div>
       </main>
-      <Chatbot />
+      <Chatbot appState={state} />
     </div>
   );
 }

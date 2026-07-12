@@ -18,6 +18,8 @@ import {
   Loader2
 } from 'lucide-react';
 import { AIInsightCard } from './ui/AIInsightCard';
+import { parseReceiptWithAI } from '../utils/ai';
+import { useToast } from '../context/ToastContext';
 
 interface FinanceViewProps {
   fuel: FuelLog[];
@@ -40,6 +42,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   currencySymbol = '$',
   suspiciousThreshold = 4.5
 }) => {
+  const toast = useToast();
   const [isAddFuelOpen, setIsAddFuelOpen] = useState(false);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
 
@@ -63,19 +66,43 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   const [isScanningReceipt, setIsScanningReceipt] = useState(false);
   const [receiptScanned, setReceiptScanned] = useState(false);
 
-  const handleScanReceipt = () => {
+  const handleScanReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     setIsScanningReceipt(true);
     setReceiptScanned(false);
-    // Simulate AI processing delay
-    setTimeout(() => {
+    
+    try {
+      // Read file as Base64
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Data = (reader.result as string).split(',')[1];
+        
+        try {
+          const extractedData = await parseReceiptWithAI(base64Data, file.type);
+          
+          setReceiptScanned(true);
+          // Auto-fill form with extracted data
+          setExpType(extractedData.category);
+          setExpAmount(extractedData.amount);
+          setExpDesc(`${extractedData.vendor} (AI Extracted)`);
+          if (extractedData.date) {
+            setExpDate(extractedData.date);
+          }
+          toast.success('AI Extraction Complete', `Successfully extracted data for ${extractedData.vendor}.`);
+        } catch (err) {
+          console.error('AI Extraction error:', err);
+          toast.error('AI Error', 'Failed to parse the receipt. Please enter details manually.');
+        } finally {
+          setIsScanningReceipt(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
       setIsScanningReceipt(false);
-      setReceiptScanned(true);
-      // Auto-fill form with extracted data
-      setExpType('Maintenance');
-      setExpAmount(245.50);
-      setExpDesc('AutoZone - Replacement Brake Pads (AI Extracted)');
-      // In a real app, this would come from an OCR API endpoint
-    }, 2500);
+      toast.error('File Error', 'Failed to read the uploaded image.');
+    }
   };
 
   const todayStr = '2026-07-11';
@@ -499,17 +526,30 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   </>
                 ) : (
                   <>
-                    <div className="relative">
-                      <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                    <div className="relative cursor-pointer group-hover:scale-105 transition-transform">
+                      <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center relative overflow-hidden">
                         <UploadCloud className="w-5 h-5 text-purple-400" />
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleScanReceipt}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
                       </div>
                       <Sparkles className="w-4 h-4 absolute -top-1 -right-1 text-purple-400 animate-pulse" />
                     </div>
-                    <div className="text-xs text-brand-secondary font-sans">
-                      <span className="text-purple-400 font-medium cursor-pointer hover:underline" onClick={handleScanReceipt}>
+                    <div className="text-xs text-brand-secondary font-sans relative">
+                      <span className="text-purple-400 font-medium">
                         Upload receipt
                       </span> 
                       {" "}or drag and drop
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleScanReceipt}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        title="Upload receipt"
+                      />
                       <p className="text-[10px] mt-1 text-gray-500">AI will auto-fill the form below</p>
                     </div>
                   </>
