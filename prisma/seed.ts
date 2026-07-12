@@ -70,7 +70,7 @@ async function main() {
       update: {},
       create: {
         email: 'manager@transitops.com',
-        name: 'Jameson Vance',
+        name: 'Rajesh Sharma',
         password: 'password123',
         avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
         roleId: roleMap['Fleet Manager']
@@ -81,7 +81,7 @@ async function main() {
       update: {},
       create: {
         email: 'driver@transitops.com',
-        name: 'Sarah Jenkins',
+        name: 'Sunita Patel',
         password: 'password123',
         avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=256',
         roleId: roleMap['Driver']
@@ -92,7 +92,7 @@ async function main() {
       update: {},
       create: {
         email: 'safety@transitops.com',
-        name: 'Marcus Brody',
+        name: 'Manish Gupta',
         password: 'password123',
         avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256',
         roleId: roleMap['Safety Officer']
@@ -103,7 +103,7 @@ async function main() {
       update: {},
       create: {
         email: 'analyst@transitops.com',
-        name: 'Elena Rostova',
+        name: 'Aarav Mehta',
         password: 'password123',
         avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=256',
         roleId: roleMap['Financial Analyst']
@@ -191,50 +191,50 @@ async function main() {
   const driverData = [
     {
       licenseNumber: 'DL-88121',
-      name: 'Jameson Vance',
+      name: 'Rajesh Sharma',
       licenseCategory: 'HMV' as const,
       licenseExpiryDate: '2026-11-15',
-      contactNumber: '+1 (555) 019-2831',
+      contactNumber: '+91 98765 43210',
       safetyScore: 98,
       status: 'Available' as const,
       joinedDate: '2021-03-12'
     },
     {
       licenseNumber: 'DL-22188',
-      name: 'Sarah Jenkins',
+      name: 'Sunita Patel',
       licenseCategory: 'LMV' as const,
       licenseExpiryDate: '2023-05-10',
-      contactNumber: '+1 (555) 014-9921',
+      contactNumber: '+91 87654 32109',
       safetyScore: 92,
       status: 'OnTrip' as const,
       joinedDate: '2022-06-15'
     },
     {
       licenseNumber: 'DL-99211',
-      name: 'Marcus Brody',
+      name: 'Manish Gupta',
       licenseCategory: 'HMV' as const,
       licenseExpiryDate: '2026-08-20',
-      contactNumber: '+1 (555) 017-4432',
+      contactNumber: '+91 76543 21098',
       safetyScore: 62,
       status: 'OffDuty' as const,
       joinedDate: '2020-01-10'
     },
     {
       licenseNumber: 'DL-77412',
-      name: 'Elena Rostova',
+      name: 'Aarav Mehta',
       licenseCategory: 'HMV' as const,
       licenseExpiryDate: '2027-01-30',
-      contactNumber: '+1 (555) 012-7744',
+      contactNumber: '+91 65432 10987',
       safetyScore: 45,
       status: 'Suspended' as const,
       joinedDate: '2023-04-01'
     },
     {
       licenseNumber: 'DL-55210',
-      name: 'Derrick Rose',
+      name: 'Diljit Singh',
       licenseCategory: 'LMV' as const,
       licenseExpiryDate: '2026-12-01',
-      contactNumber: '+1 (555) 015-8820',
+      contactNumber: '+91 95432 87654',
       safetyScore: 89,
       status: 'Available' as const,
       joinedDate: '2024-02-15'

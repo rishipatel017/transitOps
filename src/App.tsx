@@ -74,7 +74,7 @@ function AppInner() {
 
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('transitops_authenticated') === 'true';
+    return sessionStorage.getItem('transitops_authenticated') === 'true';
   });
 
   // Auto-persist state changes
@@ -99,7 +99,7 @@ function AppInner() {
       currentUser: user
     }));
     setIsAuthenticated(true);
-    localStorage.setItem('transitops_authenticated', 'true');
+    sessionStorage.setItem('transitops_authenticated', 'true');
   };
 
   const handleRegisterUser = (newUser: User) => {
@@ -115,7 +115,8 @@ function AppInner() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    localStorage.setItem('transitops_authenticated', 'false');
+    sessionStorage.setItem('transitops_authenticated', 'false');
+    sessionStorage.removeItem('transitops_currentUser');
   };
 
   // Personas switcher handler

@@ -66,50 +66,50 @@ export const DEFAULT_VEHICLES: Vehicle[] = [
 export const DEFAULT_DRIVERS: Driver[] = [
   {
     licenseNumber: "DL-88121",
-    name: "Jameson Vance",
+    name: "Rajesh Sharma",
     licenseCategory: "HMV",
     licenseExpiryDate: "2026-11-15",
-    contactNumber: "+1 (555) 019-2831",
+    contactNumber: "+91 98765 43210",
     safetyScore: 98,
     status: "Available",
     joinedDate: "2021-03-12"
   },
   {
     licenseNumber: "DL-22188",
-    name: "Sarah Jenkins",
+    name: "Sunita Patel",
     licenseCategory: "LMV",
     licenseExpiryDate: "2023-05-10", // EXPIRED for safety check demo!
-    contactNumber: "+1 (555) 014-9921",
+    contactNumber: "+91 87654 32109",
     safetyScore: 92,
     status: "On Trip",
     joinedDate: "2022-06-15"
   },
   {
     licenseNumber: "DL-99211",
-    name: "Marcus Brody",
+    name: "Manish Gupta",
     licenseCategory: "HMV",
     licenseExpiryDate: "2026-08-20",
-    contactNumber: "+1 (555) 017-4432",
+    contactNumber: "+91 76543 21098",
     safetyScore: 62, // Poor score
     status: "Off Duty",
     joinedDate: "2020-01-10"
   },
   {
     licenseNumber: "DL-77412",
-    name: "Elena Rostova",
+    name: "Aarav Mehta",
     licenseCategory: "HMV",
     licenseExpiryDate: "2027-01-30",
-    contactNumber: "+1 (555) 012-7744",
+    contactNumber: "+91 65432 10987",
     safetyScore: 45, // Critical Suspended demo
     status: "Suspended",
     joinedDate: "2023-04-01"
   },
   {
     licenseNumber: "DL-55210",
-    name: "Derrick Rose",
+    name: "Diljit Singh",
     licenseCategory: "LMV",
     licenseExpiryDate: "2026-12-01",
-    contactNumber: "+1 (555) 015-8820",
+    contactNumber: "+91 95432 87654",
     safetyScore: 89,
     status: "Available",
     joinedDate: "2024-02-15"
@@ -297,25 +297,25 @@ export const SYSTEM_USERS: User[] = [
   {
     email: "manager@transitops.com",
     role: "Fleet Manager",
-    name: "Jameson Vance",
+    name: "Rajesh Sharma",
     avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256"
   },
   {
     email: "driver@transitops.com",
     role: "Driver",
-    name: "Sarah Jenkins",
+    name: "Sunita Patel",
     avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=256"
   },
   {
     email: "safety@transitops.com",
     role: "Safety Officer",
-    name: "Marcus Brody",
+    name: "Manish Gupta",
     avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256"
   },
   {
     email: "analyst@transitops.com",
     role: "Financial Analyst",
-    name: "Elena Rostova",
+    name: "Aarav Mehta",
     avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=256"
   }
 ];
@@ -336,6 +336,14 @@ export function getInitialState() {
 
   const loadedUsers = load<User[]>('users', defaultUsersWithPasswords);
 
+  const savedCurrentUser = sessionStorage.getItem('transitops_currentUser');
+  let currentUser = loadedUsers[0];
+  if (savedCurrentUser) {
+    try {
+      currentUser = JSON.parse(savedCurrentUser);
+    } catch (e) {}
+  }
+
   return {
     vehicles: load('vehicles', DEFAULT_VEHICLES),
     drivers: load('drivers', DEFAULT_DRIVERS),
@@ -344,12 +352,16 @@ export function getInitialState() {
     fuel: load('fuel', DEFAULT_FUEL),
     expenses: load('expenses', DEFAULT_EXPENSES),
     users: loadedUsers,
-    currentUser: load<User>('current_user', loadedUsers[0])
+    currentUser
   };
 }
 
 export function saveState(state: any) {
   Object.keys(state).forEach(key => {
-    localStorage.setItem(`transitops_${key}`, JSON.stringify(state[key]));
+    if (key === 'currentUser') {
+      sessionStorage.setItem('transitops_currentUser', JSON.stringify(state[key]));
+    } else {
+      localStorage.setItem(`transitops_${key}`, JSON.stringify(state[key]));
+    }
   });
 }
