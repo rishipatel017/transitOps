@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Vehicle, MaintenanceLog, Expense } from '../types';
+import { Vehicle, MaintenanceLog } from '../types';
 import { 
   Plus, 
   Wrench, 
@@ -12,6 +12,7 @@ import {
   FileText,
   Hammer
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface MaintenanceViewProps {
   maintenance: MaintenanceLog[];
@@ -30,6 +31,7 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
   onUpdateVehicle,
   currencySymbol = '$'
 }) => {
+  const toast = useToast();
   const [isAddMaintOpen, setIsAddMaintOpen] = useState(false);
   const [completingMaintId, setCompletingMaintId] = useState<string | null>(null);
 
@@ -76,6 +78,7 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
     onAddMaintenance(newLog);
     // Automatically set vehicle to In Shop
     onUpdateVehicle(maintVehicleId, { status: 'In Shop' });
+    toast.success('Work Order Issued', `${maintType} scheduled for ${targetVehicle.name}. Status set to In Shop.`);
 
     setIsAddMaintOpen(false);
     setMaintVehicleId('');
@@ -88,6 +91,7 @@ export const MaintenanceView: React.FC<MaintenanceViewProps> = ({
     if (!completingMaintId) return;
 
     onCompleteMaintenance(completingMaintId, Number(finalMaintCost));
+    toast.success('Maintenance Settled', `Work order ${completingMaintId} completed. Expense recorded. Vehicle returned to Available.`);
     setCompletingMaintId(null);
   };
 

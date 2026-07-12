@@ -12,6 +12,9 @@ import { SettingsView, SystemSettings } from './components/SettingsView';
 import { LoginView } from './components/LoginView';
 import { LandingView } from './components/LandingView';
 import { motion } from 'motion/react';
+import { ToastProvider, useToast } from './context/ToastContext';
+import { ToastContainer } from './components/ui/ToastContainer';
+import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { 
   Compass, 
   Truck, 
@@ -38,11 +41,13 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
   'Financial Analyst': ['dashboard', 'finance', 'analytics', 'settings']
 };
 
-export default function App() {
+function AppInner() {
   // Load State from local storage or defaults
+  const toast = useToast();
   const [state, setState] = useState(() => getInitialState());
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // System Settings state synced with localStorage
@@ -122,10 +127,13 @@ export default function App() {
   };
 
   const handleResetData = () => {
-    if (confirm("Reset operational database to pristine simulation defaults? All custom changes will be overwritten.")) {
-      localStorage.clear();
-      window.location.reload();
-    }
+    setResetConfirmOpen(true);
+  };
+
+  const handleResetConfirmed = () => {
+    setResetConfirmOpen(false);
+    localStorage.clear();
+    window.location.reload();
   };
 
   // State Mutation Handlers
@@ -373,6 +381,16 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-background flex flex-col md:flex-row text-brand-secondary font-sans relative overflow-x-hidden" id="transitops-app">
+      <ToastContainer />
+      <ConfirmDialog
+        isOpen={resetConfirmOpen}
+        title="Reset Operational Database"
+        message="This will reset all data to pristine simulation defaults. All custom vehicles, drivers, trips, and logs will be permanently overwritten. This cannot be undone."
+        confirmLabel="RESET DATABASE"
+        variant="danger"
+        onConfirm={handleResetConfirmed}
+        onCancel={() => setResetConfirmOpen(false)}
+      />
       
       {/* Mobile Top Header */}
       <header className="md:hidden bg-brand-surface border-b border-brand-outline p-4 flex justify-between items-center z-40 sticky top-0">
@@ -644,5 +662,13 @@ export default function App() {
       </main>
 
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
+    </ToastProvider>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Vehicle, MaintenanceLog, Expense } from '../types';
+import { Vehicle, MaintenanceLog } from '../types';
 import { 
   Plus, 
   Wrench, 
@@ -14,6 +14,8 @@ import {
   X,
   Gauge
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 
 interface FleetViewProps {
   vehicles: Vehicle[];
@@ -34,11 +36,13 @@ export const FleetView: React.FC<FleetViewProps> = ({
   onAddMaintenance,
   onCompleteMaintenance
 }) => {
+  const toast = useToast();
   // Modal states
   const [isAddVehicleOpen, setIsAddVehicleOpen] = useState(false);
   const [isAddMaintOpen, setIsAddMaintOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [completingMaintId, setCompletingMaintId] = useState<string | null>(null);
+  const [retireConfirm, setRetireConfirm] = useState<string | null>(null); // regNum to retire
 
   // Form states - Vehicle
   const [regNum, setRegNum] = useState('');
@@ -90,6 +94,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
     };
 
     onAddVehicle(newVehicle);
+    toast.success('Vehicle Registered', `${newVehicle.name} (${newVehicle.registrationNumber}) added to fleet.`);
     resetVehicleForm();
   };
 
@@ -106,7 +111,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
       status: vStatus,
       nickname: nickname || undefined
     });
-
+    toast.success('Vehicle Updated', `${vName} (${editingVehicle.registrationNumber}) configuration saved.`);
     setEditingVehicle(null);
     resetVehicleForm();
   };
@@ -139,6 +144,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
     onAddMaintenance(newLog);
     // Automatically set vehicle to In Shop
     onUpdateVehicle(maintVehicleId, { status: 'In Shop' });
+    toast.success('Work Order Issued', `${maintType} scheduled for ${targetVehicle.name}. Status set to In Shop.`);
 
     setIsAddMaintOpen(false);
     setMaintVehicleId('');
@@ -151,6 +157,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
     if (!completingMaintId) return;
 
     onCompleteMaintenance(completingMaintId, Number(finalMaintCost));
+    toast.success('Maintenance Completed', `Work order ${completingMaintId} settled. Vehicle returned to Available.`);
     setCompletingMaintId(null);
   };
 
@@ -347,11 +354,7 @@ export const FleetView: React.FC<FleetViewProps> = ({
                   </button>
                   {vehicle.status !== 'On Trip' && (
                     <button 
-                      onClick={() => {
-                        if (confirm(`Retire asset ${vehicle.registrationNumber} from system operations?`)) {
-                          onDeleteVehicle(vehicle.registrationNumber);
-                        }
-                      }}
+                      onClick={() => setRetireConfirm(vehicle.registrationNumber)}
                       className="px-3 py-1.5 bg-brand-surface-high border border-brand-outline text-brand-error hover:bg-brand-error/10 hover:border-brand-error rounded-lg text-xs transition-all"
                       title="Retire Vehicle"
                     >
@@ -817,6 +820,23 @@ export const FleetView: React.FC<FleetViewProps> = ({
           </div>
         </div>
       )}
+      {/* RETIRE VEHICLE CONFIRM DIALOG */}
+      <ConfirmDialog
+        isOpen={!!retireConfirm}
+        title="Retire Fleet Asset"
+        message={`Permanently retire vehicle ${retireConfirm} from the operational system? All associated logs will be preserved but the vehicle will be removed from the active fleet.`}
+        confirmLabel="RETIRE ASSET"
+        cancelLabel="KEEP ACTIVE"
+        variant="danger"
+        onConfirm={() => {
+          if (retireConfirm) {
+            onDeleteVehicle(retireConfirm);
+            toast.warning('Vehicle Retired', `Asset ${retireConfirm} has been removed from the active fleet.`);
+            setRetireConfirm(null);
+          }
+        }}
+        onCancel={() => setRetireConfirm(null)}
+      />
 
     </div>
   );

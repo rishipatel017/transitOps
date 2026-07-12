@@ -14,6 +14,8 @@ import {
   X,
   TrendingDown
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 
 interface DriversViewProps {
   drivers: Driver[];
@@ -28,8 +30,10 @@ export const DriversView: React.FC<DriversViewProps> = ({
   onUpdateDriver,
   onDeleteDriver
 }) => {
+  const toast = useToast();
   const [isAddDriverOpen, setIsAddDriverOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Driver | null>(null);
 
   // Form states
   const [licNum, setLicNum] = useState('');
@@ -46,7 +50,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
 
   const [errorMsg, setErrorMsg] = useState('');
 
-  const todayStr = '2026-07-11'; // Fixed system time
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const isLicenseExpired = (expiryStr: string) => {
     return new Date(expiryStr) < new Date(todayStr);
@@ -76,6 +80,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
     };
 
     onAddDriver(newDriver);
+    toast.success('Driver Registered', `${newDriver.name} (${newDriver.licenseNumber}) added to the crew roster.`);
     resetForm();
   };
 
@@ -91,7 +96,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
       safetyScore: Number(safety),
       status: dStatus
     });
-
+    toast.success('Driver Updated', `${dName}'s profile has been updated.`);
     setEditingDriver(null);
     resetForm();
   };
@@ -354,11 +359,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
                   </button>
                   {driver.status !== 'On Trip' && (
                     <button 
-                      onClick={() => {
-                        if (confirm(`Remove operator ${driver.name} from active systems?`)) {
-                          onDeleteDriver(driver.licenseNumber);
-                        }
-                      }}
+                      onClick={() => setDeleteConfirm(driver)}
                       className="px-3 py-1.5 bg-brand-surface-high border border-brand-outline text-brand-error hover:bg-brand-error/10 hover:border-brand-error rounded-lg text-xs transition-all"
                       title="De-recruit driver"
                     >
@@ -589,6 +590,23 @@ export const DriversView: React.FC<DriversViewProps> = ({
           </div>
         </div>
       )}
+      {/* DELETE DRIVER CONFIRM DIALOG */}
+      <ConfirmDialog
+        isOpen={!!deleteConfirm}
+        title="Remove Crew Operator"
+        message={`Permanently remove ${deleteConfirm?.name} (${deleteConfirm?.licenseNumber}) from the active roster? All associated trip and compliance records will be preserved.`}
+        confirmLabel="REMOVE OPERATOR"
+        cancelLabel="KEEP OPERATOR"
+        variant="danger"
+        onConfirm={() => {
+          if (deleteConfirm) {
+            onDeleteDriver(deleteConfirm.licenseNumber);
+            toast.warning('Driver Removed', `${deleteConfirm.name} has been de-recruited from the system.`);
+            setDeleteConfirm(null);
+          }
+        }}
+        onCancel={() => setDeleteConfirm(null)}
+      />
 
     </div>
   );

@@ -3,7 +3,6 @@ import { Trip, Vehicle, Driver } from '../types';
 import { 
   Plus, 
   Navigation, 
-  MapPin, 
   CheckCircle2, 
   XCircle, 
   Play, 
@@ -15,6 +14,8 @@ import {
   X,
   Scale
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 
 interface TripsViewProps {
   trips: Trip[];
@@ -37,8 +38,10 @@ export const TripsView: React.FC<TripsViewProps> = ({
   onCancelTrip,
   currentRole
 }) => {
+  const toast = useToast();
   const [isNewTripOpen, setIsNewTripOpen] = useState(false);
   const [completingTripId, setCompletingTripId] = useState<string | null>(null);
+  const [abortConfirm, setAbortConfirm] = useState<string | null>(null); // tripId to abort
 
   // Form states - New Trip
   const [source, setSource] = useState('');
@@ -129,6 +132,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
     };
 
     onAddTrip(newTrip);
+    toast.success('Trip Created', `Draft trip ${newTrip.id} is ready for dispatch.`);
 
     // Reset Form
     setSource('');
@@ -158,11 +162,15 @@ export const TripsView: React.FC<TripsViewProps> = ({
 
     const vehicle = vehicles.find(v => v.registrationNumber === trip.vehicleId);
     if (vehicle && Number(finalOdometer) < vehicle.odometer) {
-      alert(`Invalid Odometer! The final odometer (${finalOdometer.toLocaleString()} km) cannot be less than the starting odometer (${vehicle.odometer.toLocaleString()} km).`);
+      toast.error(
+        'Invalid Odometer Reading',
+        `Final odometer (${Number(finalOdometer).toLocaleString()} km) cannot be less than starting odometer (${vehicle.odometer.toLocaleString()} km).`
+      );
       return;
     }
 
     onCompleteTrip(completingTripId, Number(fuelConsumed), Number(finalOdometer));
+    toast.success('Trip Completed', `Transit ${completingTripId} settled. Vehicle and driver are now available.`);
     setCompletingTripId(null);
   };
 
@@ -307,7 +315,10 @@ export const TripsView: React.FC<TripsViewProps> = ({
                   {trip.status === 'Draft' && (
                     currentRole !== 'Driver' ? (
                       <button 
-                        onClick={() => onDispatchTrip(trip.id)}
+                        onClick={() => {
+                          onDispatchTrip(trip.id);
+                          toast.success('Trip Dispatched', `Trip ${trip.id} is now en-route.`);
+                        }}
                         className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 py-2.5 bg-brand-primary text-black font-semibold rounded-lg text-xs font-mono hover:bg-white transition-all shadow-md shadow-brand-primary/5"
                       >
                         <Play className="h-3.5 w-3.5 fill-black" /> DISPATCH TRIP
@@ -327,11 +338,7 @@ export const TripsView: React.FC<TripsViewProps> = ({
                       </button>
                       {currentRole !== 'Driver' && (
                         <button 
-                          onClick={() => {
-                            if (confirm(`Abort trip ${trip.id}? This removes the vehicle/driver lock.`)) {
-                              onCancelTrip(trip.id);
-                            }
-                          }}
+                          onClick={() => setAbortConfirm(trip.id)}
                           className="py-2.5 px-3 bg-brand-surface border border-brand-outline text-brand-error hover:bg-brand-error/10 hover:border-brand-error rounded-lg text-xs transition-all"
                         >
                           ABORT
@@ -589,6 +596,23 @@ export const TripsView: React.FC<TripsViewProps> = ({
           </div>
         </div>
       )}
+      {/* ABORT TRIP CONFIRM DIALOG */}
+      <ConfirmDialog
+        isOpen={!!abortConfirm}
+        title="Abort Active Trip"
+        message={`Abort trip ${abortConfirm}? This will immediately release the vehicle and driver back to Available status. This action cannot be undone.`}
+        confirmLabel="ABORT TRIP"
+        cancelLabel="KEEP ACTIVE"
+        variant="danger"
+        onConfirm={() => {
+          if (abortConfirm) {
+            onCancelTrip(abortConfirm);
+            toast.warning('Trip Aborted', `Trip ${abortConfirm} has been cancelled. Vehicle and driver are now available.`);
+            setAbortConfirm(null);
+          }
+        }}
+        onCancel={() => setAbortConfirm(null)}
+      />
 
     </div>
   );
