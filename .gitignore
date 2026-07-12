@@ -1,0 +1,61 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# prisma
+/prisma/*.db
+/prisma/*.db-journal
+# Dependencies
+node_modules/
+/dist
+/build
+
+# Prisma files to ignore
+.env
+.env.test
+.env.local
+
+# Database files (if using local SQLite for development)
+*.db
+*.db-journal
+
+# Prisma generated client (Required if using Prisma 6/7 customized output paths)
+# Add your custom output path here if you don't use default node_modules generation
+/src/generated/prisma/
+
+# Debug and log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
