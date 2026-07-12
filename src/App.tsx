@@ -15,6 +15,7 @@ import { motion } from 'motion/react';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
+import { Chatbot } from './components/Chatbot';
 import { 
   Compass, 
   Truck, 
@@ -660,7 +661,7 @@ function AppInner() {
           )}
         </motion.div>
       </main>
-
+      <Chatbot />
     </div>
   );
 }

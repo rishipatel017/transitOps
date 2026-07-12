@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, Vehicle, Driver, Trip, MaintenanceLog, FuelLog, Expense } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { Chatbot } from './Chatbot';
 import { 
   Activity, 
   ArrowRight, 
@@ -701,7 +702,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-
+      <Chatbot />
     </div>
   );
 };
