@@ -321,6 +321,12 @@ export const SYSTEM_USERS: User[] = [
 ];
 
 export function getInitialState() {
+  // Auto-migration: if local cache has old data, clear it so new Indian default profiles load instantly
+  const cachedDrivers = localStorage.getItem('transitops_drivers');
+  if (cachedDrivers && (cachedDrivers.includes('Jameson Vance') || cachedDrivers.includes('+1 (555)'))) {
+    localStorage.clear();
+  }
+
   const load = <T>(key: string, fallback: T): T => {
     const data = localStorage.getItem(`transitops_${key}`);
     if (data) {
