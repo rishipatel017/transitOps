@@ -380,7 +380,7 @@ function AppInner() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-background flex flex-col md:flex-row text-brand-secondary font-sans relative overflow-x-hidden" id="transitops-app">
+    <div className="min-h-screen md:h-screen md:overflow-hidden bg-brand-background flex flex-col md:flex-row text-brand-secondary font-sans relative overflow-x-hidden" id="transitops-app">
       <ToastContainer />
       <ConfirmDialog
         isOpen={resetConfirmOpen}
@@ -414,7 +414,7 @@ function AppInner() {
       </header>
 
       {/* Main Sidebar */}
-      <aside className={`w-72 bg-brand-surface border-r border-brand-outline shrink-0 flex flex-col justify-between fixed md:sticky top-0 h-screen z-50 md:z-30 transition-transform duration-300 ${
+      <aside className={`w-72 bg-brand-surface border-r border-brand-outline shrink-0 flex flex-col justify-between fixed md:sticky top-0 h-screen z-50 md:z-30 transition-transform duration-300 overflow-y-auto ${
         isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`} id="app-sidebar">
         <div>

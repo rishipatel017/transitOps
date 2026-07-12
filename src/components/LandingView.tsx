@@ -59,7 +59,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const activeDispatchesCount = trips.filter(t => t.status === 'Dispatched').length;
   
   // Real active vehicle ratio for uptime
-  const activeVehiclesCount = vehicles.filter(v => v.status === 'Active').length;
+  const activeVehiclesCount = vehicles.filter(v => v.status === 'Available' || v.status === 'On Trip').length;
   const totalVehiclesCount = vehicles.length;
   const realUptime = totalVehiclesCount > 0 
     ? ((activeVehiclesCount / totalVehiclesCount) * 100).toFixed(1) 
@@ -147,10 +147,10 @@ export const LandingView: React.FC<LandingViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#051424] text-brand-secondary selection:bg-brand-primary selection:text-black overflow-x-hidden relative" id="transitops-landing">
+    <div className="min-h-screen bg-[#051424] text-brand-secondary selection:bg-brand-primary selection:text-black overflow-x-clip relative" id="transitops-landing">
       
       {/* 1. Header Navigation */}
-      <header className="sticky top-0 z-50 border-b border-brand-outline/40 bg-[#051424]/90 backdrop-blur-md px-6 py-4 flex items-center justify-between" id="landing-header">
+      <header className="sticky top-0 z-50 border-b border-brand-outline/40 bg-[#051424]/85 backdrop-blur-lg px-8 py-3.5 flex items-center justify-between shadow-lg shadow-black/25" id="landing-header">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-xl bg-brand-primary/10 border border-brand-primary/30 flex items-center justify-center text-brand-primary shadow-lg shadow-brand-primary/5">
             <Activity className="h-5 w-5 animate-pulse" />
@@ -164,10 +164,22 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
         {/* Navigation items (Mock Links) */}
         <nav className="hidden md:flex items-center gap-8 text-xs font-semibold uppercase tracking-wider" id="landing-nav">
-          <a href="#solutions" className="text-white hover:text-brand-primary transition-colors">Solutions</a>
-          <a href="#fleet" className="text-brand-secondary hover:text-white transition-colors">Fleet</a>
-          <a href="#pricing" className="text-brand-secondary hover:text-white transition-colors">Pricing</a>
-          <a href="#support" className="text-brand-secondary hover:text-white transition-colors">Support</a>
+          <a href="#solutions" className="text-brand-secondary hover:text-brand-primary transition-all duration-300 relative py-1.5 group">
+            Solutions
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-brand-primary transition-all duration-300 group-hover:w-full"></span>
+          </a>
+          <a href="#fleet" className="text-brand-secondary hover:text-brand-primary transition-all duration-300 relative py-1.5 group">
+            Fleet
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-brand-primary transition-all duration-300 group-hover:w-full"></span>
+          </a>
+          <a href="#pricing" className="text-brand-secondary hover:text-brand-primary transition-all duration-300 relative py-1.5 group">
+            Pricing
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-brand-primary transition-all duration-300 group-hover:w-full"></span>
+          </a>
+          <a href="#support" className="text-brand-secondary hover:text-brand-primary transition-all duration-300 relative py-1.5 group">
+            Support
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-brand-primary transition-all duration-300 group-hover:w-full"></span>
+          </a>
         </nav>
 
         {/* Auth Actions */}

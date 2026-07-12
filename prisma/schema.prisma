@@ -1,0 +1,257 @@
+// =============================================================================
+// TransitOps — Prisma Schema
+// Database: PostgreSQL (Neon.tech recommended)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum VehicleType {
+  Van
+  Truck
+  Mini
+}
+
+enum VehicleStatus {
+  Available
+  OnTrip    @map("On Trip")
+  InShop    @map("In Shop")
+  Retired
+}
+
+enum LicenseCategory {
+  HMV
+  LMV
+}
+
+enum DriverStatus {
+  Available
+  OnTrip   @map("On Trip")
+  OffDuty  @map("Off Duty")
+  Suspended
+}
+
+enum TripStatus {
+  Draft
+  Dispatched
+  Completed
+  Cancelled
+}
+
+enum MaintenanceStatus {
+  Active
+  Completed
+}
+
+enum ServiceType {
+  OilChange           @map("Oil Change")
+  BrakeCheck          @map("Brake Check")
+  EngineRepair        @map("Engine Repair")
+  TireReplacement     @map("Tire Replacement")
+  RoutineInspection   @map("Routine Inspection")
+  OilChangeFilter     @map("Oil Change & Filter")
+  EngineOverhaul      @map("Engine Overhaul")
+  TireAlignment       @map("Tire Alignment")
+}
+
+enum FuelStatus {
+  Approved
+  Flagged
+}
+
+enum ExpenseType {
+  Toll
+  Parking
+  Maintenance
+  Other
+}
+
+// =============================================================================
+// TABLE: roles
+// Stores user roles (Fleet Manager, Driver, Safety Officer, Financial Analyst)
+// =============================================================================
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  users       User[]
+
+  @@map("roles")
+}
+
+// =============================================================================
+// TABLE: users
+// System users with role-based access control
+// =============================================================================
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String
+  password  String
+  avatarUrl String   @map("avatar_url")
+  roleId    Int      @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  role      Role     @relation(fields: [roleId], references: [id])
+
+  @@map("users")
+}
+
+// =============================================================================
+// TABLE: vehicles
+// Fleet vehicle registry — registration number is the primary key (unique rule)
+// =============================================================================
+
+model Vehicle {
+  registrationNumber String        @id @map("registration_number")
+  name               String
+  type               VehicleType
+  maxCapacity        Float         @map("max_capacity")
+  odometer           Float
+  acquisitionCost    Float         @map("acquisition_cost")
+  status             VehicleStatus @default(Available)
+  nickname           String?
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  trips              Trip[]
+  maintenanceLogs    MaintenanceLog[]
+  fuelLogs           FuelLog[]
+  expenses           Expense[]
+
+  @@map("vehicles")
+}
+
+// =============================================================================
+// TABLE: drivers
+// Crew operator registry — license number is the primary key
+// =============================================================================
+
+model Driver {
+  licenseNumber     String          @id @map("license_number")
+  name              String
+  licenseCategory   LicenseCategory @map("license_category")
+  licenseExpiryDate String          @map("license_expiry_date")
+  contactNumber     String          @map("contact_number")
+  safetyScore       Float           @map("safety_score")
+  status            DriverStatus    @default(Available)
+  joinedDate        String          @map("joined_date")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  trips             Trip[]
+
+  @@map("drivers")
+}
+
+// =============================================================================
+// TABLE: trips
+// Trip dispatch records linking vehicles and drivers
+// =============================================================================
+
+model Trip {
+  id                 String      @id
+  source             String
+  destination        String
+  vehicleId          String      @map("vehicle_id")
+  driverId           String      @map("driver_id")
+  cargoWeight        Float       @map("cargo_weight")
+  plannedDistance    Float       @map("planned_distance")
+  status             TripStatus  @default(Draft)
+  eta                String
+  routeName          String      @map("route_name")
+  fuelConsumedLiters Float?      @map("fuel_consumed_liters")
+  finalOdometer      Float?      @map("final_odometer")
+  revenue            Float
+  date               String
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  vehicle            Vehicle     @relation(fields: [vehicleId], references: [registrationNumber])
+  driver             Driver      @relation(fields: [driverId], references: [licenseNumber])
+
+  @@map("trips")
+}
+
+// =============================================================================
+// TABLE: maintenance_logs
+// Vehicle maintenance work orders
+// =============================================================================
+
+model MaintenanceLog {
+  id             String            @id
+  vehicleId      String            @map("vehicle_id")
+  serviceType    ServiceType       @map("service_type")
+  costEstimate   Float             @map("cost_estimate")
+  completionDate String            @map("completion_date")
+  status         MaintenanceStatus @default(Active)
+  notes          String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  vehicle        Vehicle           @relation(fields: [vehicleId], references: [registrationNumber])
+
+  @@map("maintenance_logs")
+}
+
+// =============================================================================
+// TABLE: fuel_logs
+// Fuel consumption and cost tracking per vehicle
+// =============================================================================
+
+model FuelLog {
+  id        String     @id
+  vehicleId String     @map("vehicle_id")
+  liters    Float
+  cost      Float
+  date      String
+  status    FuelStatus @default(Approved)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [registrationNumber])
+
+  @@map("fuel_logs")
+}
+
+// =============================================================================
+// TABLE: expenses
+// Operational expense ledger (tolls, parking, maintenance, etc.)
+// =============================================================================
+
+model Expense {
+  id          String      @id
+  vehicleId   String      @map("vehicle_id")
+  type        ExpenseType
+  amount      Float
+  date        String
+  description String
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  vehicle     Vehicle     @relation(fields: [vehicleId], references: [registrationNumber])
+
+  @@map("expenses")
+}
