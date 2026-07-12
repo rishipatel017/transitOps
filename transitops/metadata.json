@@ -1,0 +1,6 @@
+{
+  "name": "TransitOps",
+  "description": "Centralized platform to manage transport operations including fleet registry, driver compliance, trip dispatch, maintenance, and financial analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
