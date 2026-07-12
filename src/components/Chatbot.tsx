@@ -15,7 +15,7 @@ export const Chatbot: React.FC = () => {
     {
       id: 'welcome',
       sender: 'bot',
-      text: "Hello! I am Antigravity, your TransitOps AI Assistant. 🚚 How can I help you manage your fleet, drivers, and operations today?",
+      text: "Hello I am your assistant, your TransitOps AI Assistant. 🚚 How can I help you manage your fleet, drivers, and operations today?",
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
