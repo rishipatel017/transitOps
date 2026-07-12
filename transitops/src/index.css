@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Lexend", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Custom Colors representing Kinetic Precision System */
+  --color-brand-background: #051424;
+  --color-brand-surface: #0c1929;
+  --color-brand-surface-high: #152639;
+  --color-brand-surface-lowest: #020b14;
+  --color-brand-surface-low: #0a1320;
+  --color-brand-primary: #ffc880;
+  --color-brand-primary-container: #f5a623;
+  --color-brand-secondary: #bec6e0;
+  --color-brand-tertiary: #c4d3ec;
+  --color-brand-error: #ffb4ab;
+  --color-brand-error-container: #410002;
+  --color-brand-outline: #334155;
+  --color-brand-outline-accent: #524534;
+}
+
+body {
+  background-color: #051424;
+  color: #d4e4fa;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Glass panel style */
+.glass-panel {
+  background: rgba(12, 25, 41, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(82, 69, 52, 0.25);
+}
+
+.glass-card {
+  background: rgba(15, 27, 44, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(51, 65, 85, 0.4);
+}
+
+/* Material Icons custom setting */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #051424;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #ffc88044;
+}
+
+/* Shimmer animations */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.4; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s infinite ease-in-out;
+}
