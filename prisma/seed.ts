@@ -67,7 +67,7 @@ async function main() {
   const users = await Promise.all([
     prisma.user.upsert({
       where: { email: 'manager@transitops.com' },
-      update: {},
+      update: { name: 'Rajesh Sharma' },
       create: {
         email: 'manager@transitops.com',
         name: 'Rajesh Sharma',
@@ -78,7 +78,7 @@ async function main() {
     }),
     prisma.user.upsert({
       where: { email: 'driver@transitops.com' },
-      update: {},
+      update: { name: 'Sunita Patel' },
       create: {
         email: 'driver@transitops.com',
         name: 'Sunita Patel',
@@ -89,7 +89,7 @@ async function main() {
     }),
     prisma.user.upsert({
       where: { email: 'safety@transitops.com' },
-      update: {},
+      update: { name: 'Manish Gupta' },
       create: {
         email: 'safety@transitops.com',
         name: 'Manish Gupta',
@@ -100,7 +100,7 @@ async function main() {
     }),
     prisma.user.upsert({
       where: { email: 'analyst@transitops.com' },
-      update: {},
+      update: { name: 'Aarav Mehta' },
       create: {
         email: 'analyst@transitops.com',
         name: 'Aarav Mehta',
@@ -244,7 +244,10 @@ async function main() {
   for (const d of driverData) {
     await prisma.driver.upsert({
       where: { licenseNumber: d.licenseNumber },
-      update: {},
+      update: {
+        name: d.name,
+        contactNumber: d.contactNumber
+      },
       create: d
     });
   }
