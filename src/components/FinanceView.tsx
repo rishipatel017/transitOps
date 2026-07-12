@@ -11,8 +11,13 @@ import {
   X, 
   Layers, 
   TrendingUp,
-  Cpu
+  Cpu,
+  Sparkles,
+  UploadCloud,
+  Check,
+  Loader2
 } from 'lucide-react';
+import { AIInsightCard } from './ui/AIInsightCard';
 
 interface FinanceViewProps {
   fuel: FuelLog[];
@@ -53,6 +58,25 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
   // Filter state for fuel audit
   const [fuelFilter, setFuelFilter] = useState<'All' | 'Approved' | 'Flagged'>('All');
+
+  // AI Receipt Scanner State
+  const [isScanningReceipt, setIsScanningReceipt] = useState(false);
+  const [receiptScanned, setReceiptScanned] = useState(false);
+
+  const handleScanReceipt = () => {
+    setIsScanningReceipt(true);
+    setReceiptScanned(false);
+    // Simulate AI processing delay
+    setTimeout(() => {
+      setIsScanningReceipt(false);
+      setReceiptScanned(true);
+      // Auto-fill form with extracted data
+      setExpType('Maintenance');
+      setExpAmount(245.50);
+      setExpDesc('AutoZone - Replacement Brake Pads (AI Extracted)');
+      // In a real app, this would come from an OCR API endpoint
+    }, 2500);
+  };
 
   const todayStr = '2026-07-11';
 
@@ -208,6 +232,17 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               >
                 <Plus className="h-3.5 w-3.5" /> LOG FUEL FILL
               </button>
+            </div>
+
+            {/* AI Fuel Fraud Detection Insight */}
+            <div className="mb-4">
+              <AIInsightCard 
+                title="AI Fuel Anomaly Detector Active"
+                description="Our AI model has detected a potential anomaly in Vehicle DL-99211 (Truck). The reported fuel volume exceeds the vehicle's historical consumption rate for the distance traveled. Please review the flagged logs."
+                type="warning"
+                actionText="View AI Report"
+                onAction={() => setFuelFilter('Flagged')}
+              />
             </div>
 
             {/* Fuel Log Filter Buttons */}
@@ -443,6 +478,43 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               <button onClick={() => setIsAddExpenseOpen(false)} className="text-brand-secondary hover:text-white">
                 <X className="h-5 w-5" />
               </button>
+            </div>
+
+            {/* AI Receipt Scanner Dropzone */}
+            <div className="border border-dashed border-purple-500/50 rounded-xl p-4 bg-purple-500/5 relative overflow-hidden group">
+              {isScanningReceipt && (
+                <div className="absolute inset-0 bg-brand-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-purple-400 animate-spin mb-2" />
+                  <span className="text-xs text-purple-300 font-mono">AI Extracting Data...</span>
+                </div>
+              )}
+              
+              <div className="flex flex-col items-center justify-center text-center space-y-2">
+                {receiptScanned ? (
+                  <>
+                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center mb-1">
+                      <Check className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <p className="text-xs text-emerald-400 font-mono">Receipt successfully parsed!</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                        <UploadCloud className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <Sparkles className="w-4 h-4 absolute -top-1 -right-1 text-purple-400 animate-pulse" />
+                    </div>
+                    <div className="text-xs text-brand-secondary font-sans">
+                      <span className="text-purple-400 font-medium cursor-pointer hover:underline" onClick={handleScanReceipt}>
+                        Upload receipt
+                      </span> 
+                      {" "}or drag and drop
+                      <p className="text-[10px] mt-1 text-gray-500">AI will auto-fill the form below</p>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             <form onSubmit={handleAddExpenseSubmit} className="space-y-4 text-xs font-mono">
