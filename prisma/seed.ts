@@ -78,10 +78,10 @@ async function main() {
     }),
     prisma.user.upsert({
       where: { email: 'driver@transitops.com' },
-      update: { name: 'Sunita Patel' },
+      update: { name: 'Rajesh Babu' },
       create: {
         email: 'driver@transitops.com',
-        name: 'Sunita Patel',
+        name: 'Rajesh Babu',
         password: 'password123',
         avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=256',
         roleId: roleMap['Driver']
@@ -201,7 +201,7 @@ async function main() {
     },
     {
       licenseNumber: 'DL-22188',
-      name: 'Sunita Patel',
+      name: 'Rajesh Babu',
       licenseCategory: 'LMV' as const,
       licenseExpiryDate: '2023-05-10',
       contactNumber: '+91 87654 32109',

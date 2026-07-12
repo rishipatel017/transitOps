@@ -76,7 +76,7 @@ export const DEFAULT_DRIVERS: Driver[] = [
   },
   {
     licenseNumber: "DL-22188",
-    name: "Sunita Patel",
+    name: "Rajesh Babu",
     licenseCategory: "LMV",
     licenseExpiryDate: "2023-05-10", // EXPIRED for safety check demo!
     contactNumber: "+91 87654 32109",
@@ -303,7 +303,7 @@ export const SYSTEM_USERS: User[] = [
   {
     email: "driver@transitops.com",
     role: "Driver",
-    name: "Sunita Patel",
+    name: "Rajesh Babu",
     avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=256"
   },
   {
